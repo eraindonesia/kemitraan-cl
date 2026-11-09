@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SI-MITRA KONSERVASI SULTENG</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0B2A4A">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e8f94'/%3E%3Cpath d='M8 21h16l-3 4H11zM16 6v13M16 8l7 10h-7z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="sync" class="sync" hidden></div>
+
+<!-- ===== Layar masuk / daftar ===== -->
+<div id="authScreen" class="auth" hidden>
+  <section class="auth-l">
+    <div>
+      <div class="brand" style="border:0;padding:0">
+        <div class="logo"><span class="mi">sailing</span></div>
+        <div><b>SI-MITRA KONSERVASI</b><small>DKP PROVINSI SULAWESI TENGAH</small></div>
+      </div>
+      <h1>Kemitraan pengelolaan kawasan konservasi, satu pintu.</h1>
+      <p>Ajukan, pantau, dan selesaikan 12 tahap kemitraan secara transparan, dari koordinasi awal hingga monitoring dan evaluasi.</p>
+    </div>
+    <ul>
+      <li><span class="mi">task_alt</span> Pelacakan 12 tahap secara langsung</li>
+      <li><span class="mi">folder_managed</span> Dokumen persyaratan tersimpan rapi</li>
+      <li><span class="mi">verified_user</span> Jejak audit setiap keputusan</li>
+    </ul>
+  </section>
+  <section class="auth-r">
+    <div class="auth-box">
+      <div class="seg" role="tablist">
+        <button id="tabLogin" class="on" role="tab" data-act="auth-tab" data-v="login">Masuk</button>
+        <button id="tabReg" role="tab" data-act="auth-tab" data-v="register">Daftar Mitra</button>
+      </div>
+      <form id="formLogin" autocomplete="on" novalidate>
+        <h2>Selamat datang</h2><p>Masuk untuk melanjutkan ke dasbor Anda.</p>
+        <div class="fld"><label for="lgEmail">Email</label><input id="lgEmail" class="in" type="email" autocomplete="username" required></div>
+        <div class="fld"><label for="lgPw">Kata sandi</label>
+          <div class="pw"><input id="lgPw" class="in" type="password" autocomplete="current-password" required>
+          <button type="button" class="icon-btn" data-act="togglePw" aria-label="Tampilkan kata sandi" style="width:32px;height:32px"><span class="mi">visibility</span></button></div></div>
+        <div id="lgErr" class="errtxt" role="alert" style="margin-bottom:10px"></div>
+        <button class="btn btn-p btn-block" id="btnLogin" type="submit">Masuk</button>
+      </form>
+      <form id="formReg" autocomplete="off" novalidate hidden>
+        <h2>Daftar sebagai mitra</h2><p>Buat akun untuk mengajukan kemitraan.</p>
+        <div class="fld"><label for="rgLembaga">Nama lembaga <i>*</i></label><input id="rgLembaga" class="in" required></div>
+        <div class="fld"><label for="rgJenis">Jenis mitra <i>*</i></label><select id="rgJenis" class="in" required></select></div>
+        <div class="row2">
+          <div class="fld"><label for="rgNama">Penanggung jawab <i>*</i></label><input id="rgNama" class="in" required></div>
+          <div class="fld"><label for="rgJab">Jabatan</label><input id="rgJab" class="in"></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label for="rgEmail">Email <i>*</i></label><input id="rgEmail" type="email" class="in" required></div>
+          <div class="fld"><label for="rgTelp">Telepon / WhatsApp <i>*</i></label><input id="rgTelp" type="tel" class="in" required></div>
+        </div>
+        <div class="fld"><label for="rgPw">Kata sandi <i>*</i></label><input id="rgPw" type="password" class="in" autocomplete="new-password" required>
+          <div class="meter"><i id="pwMeter"></i></div><span class="hint" id="pwHint">Minimal 8 karakter, kombinasikan huruf dan angka.</span></div>
+        <div id="rgErr" class="errtxt" role="alert" style="margin-bottom:10px"></div>
+        <button class="btn btn-p btn-block" id="btnReg" type="submit">Buat akun</button>
+      </form>
+      <div class="verif-box"><button class="btn btn-o btn-s" data-act="openVerif"><span class="mi">qr_code_scanner</span> Verifikasi dokumen resmi</button>
+        <div id="helpdesk" style="margin-top:10px"></div></div>
+    </div>
+  </section>
+</div>
+
+<!-- ===== Aplikasi (SPA) ===== -->
+<div id="appShell" class="shell" hidden>
+  <div id="scrim" class="scrim" data-act="closeNav"></div>
+  <aside id="sidebar" class="sidebar" aria-label="Navigasi utama">
+    <div class="brand"><div class="logo"><span class="mi">sailing</span></div>
+      <div><b>SI-MITRA</b><small>KONSERVASI SULTENG</small></div></div>
+    <nav id="nav" class="nav"></nav>
+    <div class="side-foot">
+      <div class="avatar" id="sbAv">?</div>
+      <div class="who"><b id="sbName">-</b><small id="sbRole">-</small></div>
+      <button class="icon-btn" data-act="logout" aria-label="Keluar" title="Keluar" style="color:#bcd0e4"><span class="mi">logout</span></button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn burger" data-act="openNav" aria-label="Buka menu"><span class="mi">menu</span></button>
+      <h1 id="pageTitle">Dasbor</h1>
+      <label class="search"><span class="mi" style="color:var(--tx-3)">search</span><input id="gSearch" type="search" placeholder="Cari nomor / lembaga / judul" aria-label="Cari pengajuan"></label>
+      <button class="icon-btn" data-act="toggleTheme" aria-label="Ganti tema"><span class="mi" id="themeIc">dark_mode</span></button>
+      <div style="position:relative">
+        <button class="icon-btn" data-act="toggleNotif" aria-label="Notifikasi"><span class="mi">notifications</span><span class="dot" id="notifDot" hidden>0</span></button>
+        <div id="notifPop" class="notif-pop" hidden></div>
+      </div>
+    </header>
+    <main id="view" class="view" tabindex="-1" aria-live="polite"></main>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script src="js/config.js"></script>
+<script src="js/core.js"></script>
+<script src="js/api.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/actions.js"></script>
+</body>
+</html>
