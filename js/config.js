@@ -5,6 +5,6 @@
  * kata sandi, token, atau kunci API apa pun di folder frontend.
  * ===================================================================== */
 window.SIMITRA_CONFIG = {
-  API_URL: 'PASTE_URL_EXEC_DI_SINI',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxKSO9qBoXTy2wz4ZxBezNMgaZTtRd4fwbBCSU3lFCfX0nrC-hNmACuoSsLJ69LfBz4jg/exec',
   TIMEOUT_MS: 45000   // GAS bisa lambat saat "cold start"
 };
