@@ -32,13 +32,16 @@ function unwrap(r) {
   if (e.code === 'AUTH' && S.token) forceLogout(e.message);
   throw e;
 }
-async function doPostOnce(action, data) {
-  return unwrap(await rawFetch(apiUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, data: data || {}, token: S.token }) }));
+function newReqId() { try { return crypto.randomUUID().replace(/-/g, ''); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2, 14) + Math.random().toString(36).slice(2, 10); } }
+async function doPostOnce(action, data, reqId) {
+  const b = { action: action, data: data || {}, token: S.token }; if (reqId) b.reqId = reqId; // idempoten untuk aksi tulis (Prinsip 6)
+  return unwrap(await rawFetch(apiUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(b) }));
 }
 async function runApi(action, data, retry) {
-  try { return await doPostOnce(action, data); }
+  const rid = READ_ACTIONS.test(action) ? null : newReqId();
+  try { return await doPostOnce(action, data, rid); }
   catch (e) {
-    if (retry && !e.code) { await new Promise(function (r) { setTimeout(r, 800); }); try { return await doPostOnce(action, data); } catch (e2) { throw netError(e2); } }
+    if (retry && !e.code) { await new Promise(function (r) { setTimeout(r, 800); }); try { return await doPostOnce(action, data, rid); } catch (e2) { throw netError(e2); } }
     throw netError(e);
   }
 }

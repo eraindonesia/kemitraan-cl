@@ -8,7 +8,7 @@ function showAuth() {
 }
 function showApp() { $('authScreen').hidden = true; $('appShell').hidden = false; applyTheme(); }
 function forceLogout(msg) {
-  S.token = null; S.me = null; S.peta = null; S.dok = null; S._sig = null; LS.del('sm_tok'); LS.del('sm_snap'); LS.del('sm_peta'); LS.del('sm_form'); S.det = {}; S.stack = []; S.view = '';
+  S.token = null; S.me = null; S.peta = null; S.dok = null; S._sig = null; LS.del('sm_tok'); LS.del('sm_snap'); LS.del('sm_peta'); LS.del('sm_form'); S.det = {}; S.dash = { periode: 'all', kawasan: '' }; S.params = {}; S.stack = []; S.view = '';
   showAuth(); if (msg) $('lgErr').textContent = msg;
 }
 function afterAuth(r) {

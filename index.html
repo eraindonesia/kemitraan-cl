@@ -8,6 +8,8 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#0B2A4A">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e8f94'/%3E%3Cpath d='M8 21h16l-3 4H11zM16 6v13M16 8l7 10h-7z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,22 +23,25 @@
 <!-- ===== Layar masuk / daftar ===== -->
 <div id="authScreen" class="auth" hidden>
   <section class="auth-l">
-    <div>
-      <div class="brand" style="border:0;padding:0">
-        <img class="logo-img" src="https://res.cloudinary.com/twobznku/image/upload/f_auto/q_auto/Coat_of_arms_of_Central_Sulawesi_k6ch8y.png" alt="Lambang Provinsi Sulawesi Tengah" width="42" height="42" decoding="async">
-        <div><b>SI-MITRA KONSERVASI</b><small>DKP PROVINSI SULAWESI TENGAH</small></div>
-      </div>
-      <h1>Kemitraan pengelolaan kawasan konservasi, satu pintu.</h1>
-      <p>Ajukan, pantau, dan selesaikan 12 tahap kemitraan secara transparan, dari koordinasi awal hingga monitoring dan evaluasi.</p>
+    <div class="auth-top">
+      <img class="logo-img" src="https://res.cloudinary.com/twobznku/image/upload/f_auto/q_auto/Coat_of_arms_of_Central_Sulawesi_k6ch8y.png" alt="Lambang Provinsi Sulawesi Tengah" width="54" height="54" decoding="async">
+      <div><b>SI-MITRA KONSERVASI</b><small>DKP PROVINSI SULAWESI TENGAH</small></div>
     </div>
-    <ul>
-      <li><span class="mi">task_alt</span> Pelacakan 12 tahap secara langsung</li>
-      <li><span class="mi">folder_managed</span> Dokumen persyaratan tersimpan rapi</li>
-      <li><span class="mi">verified_user</span> Jejak audit setiap keputusan</li>
-    </ul>
+    <div class="auth-mid">
+      <span class="eyebrow"><span class="mi">waves</span> Portal Kemitraan Kawasan Konservasi</span>
+      <h1>Kemitraan pengelolaan kawasan konservasi, <em>satu pintu.</em></h1>
+      <p>Ajukan, pantau, dan selesaikan 12 tahap kemitraan secara transparan, dari koordinasi awal hingga monitoring dan evaluasi.</p>
+      <div class="auth-cards">
+        <div><span class="mi">route</span><b>12 tahap terlacak</b><small>Status setiap usulan terlihat langsung</small></div>
+        <div><span class="mi">map</span><b>Peta area kelola</b><small>Gambar lokasi langsung di peta</small></div>
+        <div><span class="mi">verified_user</span><b>Jejak audit</b><small>Setiap keputusan tercatat</small></div>
+      </div>
+    </div>
+    <div class="auth-foot">Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah</div>
   </section>
   <section class="auth-r">
     <div class="auth-box">
+      <div class="auth-mlogo"><img class="logo-img" src="https://res.cloudinary.com/twobznku/image/upload/f_auto/q_auto/Coat_of_arms_of_Central_Sulawesi_k6ch8y.png" alt="" width="44" height="44" decoding="async"><div><b>SI-MITRA KONSERVASI</b><small>DKP Provinsi Sulawesi Tengah</small></div></div>
       <div class="seg" role="tablist">
         <button id="tabLogin" class="on" role="tab" data-act="auth-tab" data-v="login">Masuk</button>
         <button id="tabReg" role="tab" data-act="auth-tab" data-v="register">Daftar Mitra</button>
@@ -79,31 +84,32 @@
   <aside id="sidebar" class="sidebar" aria-label="Navigasi utama">
     <div class="brand"><img class="logo-img" src="https://res.cloudinary.com/twobznku/image/upload/f_auto/q_auto/Coat_of_arms_of_Central_Sulawesi_k6ch8y.png" alt="Lambang Provinsi Sulawesi Tengah" width="42" height="42" decoding="async">
       <div><b>SI-MITRA</b><small>DKP SULTENG</small></div></div>
-    <nav id="nav" class="nav"></nav>
-    <div class="side-box"><div class="grp">Aksi cepat</div>
-      <button class="pri" data-act="newForm" id="qaNew"><span class="mi">add_circle</span>Ajukan usulan baru</button>
-      <button data-act="cekLokasi"><span class="mi">travel_explore</span>Cek lokasi kawasan</button>
-      <button data-act="bantuan"><span class="mi">help</span>Bantuan & panduan</button></div>
-    <div class="side-foot">
-      <div class="avatar" id="sbAv">?</div>
-      <div class="who"><b id="sbName">-</b><small id="sbRole">-</small></div>
-      <button class="icon-btn" data-act="logout" aria-label="Keluar" title="Keluar" style="color:#bcd0e4"><span class="mi">logout</span></button>
-    </div>
-    <div class="side-ver"><span>v2.1 DKP Sulteng</span><span id="sbOnline">●</span></div>
+    <button class="side-cta" data-act="newForm" id="qaNew"><span class="mi">add_circle</span><span>Ajukan Usulan Baru</span></button>
+    <nav id="nav" class="nav" aria-label="Menu"></nav>
+    <div class="side-ver"><button data-act="bantuan"><span class="mi">help</span>Bantuan &amp; panduan</button><span class="ver">v2.2 · <i id="sbOnline">●</i></span></div>
   </aside>
   <div class="main">
     <header class="topbar">
       <button class="icon-btn burger" data-act="openNav" aria-label="Buka menu"><span class="mi">menu</span></button>
       <h1 id="pageTitle" class="sr-or-title">Dasbor</h1>
       <label class="search"><span class="mi" style="color:var(--tx-3)">search</span><input id="gSearch" type="search" placeholder="Cari usulan, nomor dokumen, mitra, atau kawasan…" aria-label="Cari pengajuan"></label>
-      <div class="chip-sys" title="Sistem Informasi Kemitraan Pengelolaan Kawasan Konservasi Sulawesi Tengah"><span class="mi" style="font-size:16px">info</span><span>Sistem Informasi Kemitraan Pengelolaan Kawasan Konservasi</span></div>
-      <div class="chip-sys hide-sm" id="monthChip"><span class="mi" style="font-size:16px">calendar_today</span><span></span></div>
-      <button class="icon-btn" data-act="toggleTheme" aria-label="Ganti tema"><span class="mi" id="themeIc">dark_mode</span></button>
-      <div style="position:relative">
-        <button class="icon-btn" data-act="toggleNotif" aria-label="Notifikasi"><span class="mi">notifications</span><span class="dot" id="notifDot" hidden>0</span></button>
+      <button class="icon-btn hide-sm" data-act="cekLokasi" aria-label="Cek lokasi kawasan" title="Cek lokasi kawasan"><span class="mi">travel_explore</span></button>
+      <button class="icon-btn hide-sm" data-act="toggleTheme" aria-label="Ganti tema" title="Ganti tema"><span class="mi" id="themeIc">dark_mode</span></button>
+      <div class="pop-wrap">
+        <button class="icon-btn" data-act="toggleNotif" aria-label="Notifikasi" title="Notifikasi"><span class="mi">notifications</span><span class="dot" id="notifDot" hidden>0</span></button>
         <div id="notifPop" class="notif-pop" hidden></div>
       </div>
-      <div class="profile"><div class="avatar" id="tbAv">?</div><div><b id="tbName">-</b><small id="tbRole">-</small></div></div>
+      <div class="pop-wrap">
+        <button class="profile" data-act="toggleProf" aria-haspopup="true" aria-label="Menu akun"><div class="avatar" id="tbAv">?</div><div class="pf-t"><b id="tbName">-</b><small id="tbRole">-</small></div><span class="mi pf-c">expand_more</span></button>
+        <div id="profPop" class="prof-pop" hidden>
+          <div class="pp-h"><div class="avatar" id="ppAv">?</div><div><b id="ppName">-</b><small id="ppRole">-</small></div></div>
+          <button data-act="profGo" data-v="akun"><span class="mi">manage_accounts</span>Pengaturan akun</button>
+          <button data-act="cekLokasi"><span class="mi">travel_explore</span>Cek lokasi kawasan</button>
+          <button data-act="bantuan"><span class="mi">help</span>Bantuan &amp; panduan</button>
+          <button data-act="toggleTheme"><span class="mi">contrast</span>Ganti tema</button>
+          <button class="out" data-act="logout"><span class="mi">logout</span>Keluar</button>
+        </div>
+      </div>
     </header>
     <main id="view" class="view" tabindex="-1" aria-live="polite"></main>
   </div>

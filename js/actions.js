@@ -161,7 +161,7 @@ const ACT = {
   modalBg: function (el, e) { if (e.target === el) closeModal(); },
   logout: function () { modal({ title: 'Keluar dari aplikasi?', ok: 'Keluar', onOk: function () { const t = S.token; closeModal(); api('logout').catch(function () {}); forceLogout(); } }); },
   toggleTheme: function () { applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); },
-  toggleNotif: function () { const p = $('notifPop'); if (p.hidden) renderNotif(); p.hidden = !p.hidden; },
+  toggleNotif: function () { const p = $('notifPop'); if (p.hidden) renderNotif(); p.hidden = !p.hidden; closePop('notifPop'); },
   readAll: function () { S.notif.forEach(function (n) { n.dibaca = true; }); renderNotif(); renderNav(); persist(); api('notif_baca', { semua: true }).catch(function () {}); },
   openNotif: function (el) { closePop(); const id = el.dataset.id; if (pById(id)) navigateTo('detail', { id: id }); },
   nav: function (el) { const it = navItems()[+el.dataset.i]; navigateTo(it.id, it.p || {}); },
@@ -189,7 +189,9 @@ const ACT = {
 function bindEvents() {
   document.addEventListener('click', function (e) {
     const el = e.target.closest('[data-act]'); if (el && ACT[el.dataset.act]) { ACT[el.dataset.act](el, e); }
-    if (!e.target.closest('#notifPop') && !e.target.closest('[data-act="toggleNotif"]')) closePop();
+    if (!e.target.closest('#notifPop') && !e.target.closest('[data-act="toggleNotif"]')) { const q = $('notifPop'); if (q) q.hidden = true; }
+    if (e.target.closest('#profPop button') && !e.target.closest('[data-act="toggleTheme"]')) { const q = $('profPop'); if (q) q.hidden = true; }
+    if (!e.target.closest('#profPop') && !e.target.closest('[data-act="toggleProf"]')) { const q = $('profPop'); if (q) q.hidden = true; }
   });
   document.addEventListener('input', function (e) {
     const t = e.target;

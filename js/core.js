@@ -121,24 +121,24 @@ function navigateTo(view, params, opts) {
 function goBack(fallback) { const p = S.stack.pop(); if (p) { S.view = p.view; S.params = p.params; S.dirty = false; renderNav(); renderView(); window.scrollTo(0, 0); } else navigateTo(fallback || 'dashboard', {}, { replace: true }); }
 function openNav() { $('sidebar').classList.add('open'); $('scrim').classList.add('show'); }
 function closeNav() { $('sidebar').classList.remove('open'); $('scrim').classList.remove('show'); }
-function closePop() { const p = $('notifPop'); if (p) p.hidden = true; }
+function closePop(keep) { ['notifPop', 'profPop'].forEach(function (id) { const p = $(id); if (p && id !== keep) p.hidden = true; }); }
 
 function pkey(p) { p = p || {}; return [p.aksi ? 1 : 0, p.tahap || '', p.t1 || ''].join('|'); }
 function navItems() {
-  const r = S.me.peran, n = S.daftar.filter(needsAction).length; const a = [{ grp: 'Navigasi utama' }];
-  a.push({ id: 'dashboard', ic: 'dashboard', t: 'Dashboard' });
-  a.push({ id: 'daftar', ic: 'list_alt', t: r === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan', p: {} });
-  if (r === 'mitra' || r === 'admin') a.push({ id: 'form', ic: 'edit_document', t: 'Ajukan Kemitraan' });
+  const r = S.me.peran, n = S.daftar.filter(needsAction).length, staff = r !== 'mitra'; const a = [];
+  a.push({ grp: 'Ringkasan' });
+  a.push({ id: 'dashboard', ic: 'space_dashboard', t: 'Dashboard' });
+  a.push({ id: 'peta', ic: 'map', t: 'Peta Kawasan' });
+  a.push({ grp: 'Pengajuan' });
+  a.push({ id: 'daftar', ic: 'inbox', t: r === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan', p: {} });
   if (r === 'mitra') a.push({ id: 'daftar', ic: 'pending_actions', t: 'Perlu Dilengkapi', p: { aksi: 1 }, badge: n });
   else a.push({ id: 'daftar', ic: 'fact_check', t: 'Telaah & Verifikasi', p: { t1: 3, t2: 8 }, badge: n });
   a.push({ id: 'dokumen', ic: 'description', t: 'Berita Acara & PKS' });
   a.push({ id: 'daftar', ic: 'monitoring', t: 'Monitoring & Evaluasi', p: { tahap: '12' } });
-  a.push({ id: 'peta', ic: 'map', t: 'Peta Kawasan' });
+  a.push({ grp: 'Laporan & Verifikasi' });
   a.push({ id: 'statistik', ic: 'bar_chart', t: 'Laporan & Statistik' });
-  a.push({ grp: 'Tata kelola' });
-  if (r === 'admin') { a.push({ id: 'users', ic: 'group', t: 'Manajemen Pengguna' }); a.push({ id: 'master', ic: 'tune', t: 'Data Master & Batas' }); }
   a.push({ id: 'verifikasi', ic: 'verified_user', t: 'Verifikasi Dokumen' });
-  a.push({ id: 'akun', ic: 'manage_accounts', t: 'Pengaturan Akun' });
+  if (r === 'admin') { a.push({ grp: 'Administrasi' }); a.push({ id: 'users', ic: 'group', t: 'Manajemen Pengguna' }); a.push({ id: 'master', ic: 'tune', t: 'Data Master & Batas' }); }
   return a;
 }
 function navActive(it) { if (it.grp || it.id !== S.view) return false; if (it.id === 'daftar') return pkey(it.p) === pkey(S.params); return true; }
@@ -147,9 +147,8 @@ function renderNav() {
     if (it.grp) return '<div class="grp">' + esc(it.grp) + '</div>';
     return '<button class="' + (navActive(it) ? 'on' : '') + '" data-act="nav" data-i="' + i + '">' + mi(it.ic) + '<span>' + esc(it.t) + '</span>' + (it.badge ? '<span class="badge">' + it.badge + '</span>' : '') + '</button>';
   }).join('');
-  const ini = initials(S.me.nama); $('sbAv').textContent = ini; $('tbAv').textContent = ini;
-  $('sbName').textContent = S.me.nama; $('sbRole').textContent = S.me.peran_nama; $('tbName').textContent = S.me.nama; $('tbRole').textContent = S.me.peran_nama;
-  $('monthChip').lastElementChild.textContent = new Date().toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+  const ini = initials(S.me.nama); $('tbAv').textContent = ini; $('ppAv').textContent = ini;
+  $('tbName').textContent = S.me.nama; $('tbRole').textContent = S.me.peran_nama; $('ppName').textContent = S.me.nama; $('ppRole').textContent = S.me.peran_nama;
   $('qaNew').hidden = !(S.me.peran === 'mitra' || S.me.peran === 'admin');
   const unread = S.notif.filter(function (n) { return !(n.dibaca === true || n.dibaca === 'TRUE'); }).length;
   const d = $('notifDot'); d.hidden = !unread; d.textContent = unread > 9 ? '9+' : unread;
