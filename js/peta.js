@@ -90,8 +90,12 @@ const MapKit = (function () {
     const map = L.map(el, { center: CENTER, zoom: ZOOM, zoomControl: true, attributionControl: true, scrollWheelZoom: opts.scroll !== false, tap: true, zoomAnimation: false, markerZoomAnimation: false });
     const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; kontributor <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>' });
     const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Citra &copy; Esri, Maxar, Earthstar Geographics' });
-    (opts.satelit ? sat : osm).addTo(map);
-    L.control.layers({ 'Peta jalan': osm, 'Citra satelit': sat }, null, { collapsed: true }).addTo(map);
+    const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap, &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>' });
+    let cur = opts.satelit ? sat : osm; cur.addTo(map);
+    let nerr = 0; osm.on('tileerror', function () { // OSM menolak/gagal → pindah otomatis ke CARTO
+      if (++nerr === 4 && map.hasLayer(osm)) { map.removeLayer(osm); carto.addTo(map); }
+    });
+    L.control.layers({ 'Peta jalan (OSM)': osm, 'Peta terang (CARTO)': carto, 'Citra satelit': sat }, null, { collapsed: true }).addTo(map);
     L.control.scale({ imperial: false }).addTo(map);
     (opts.modal ? liveModal : live).push(map); setTimeout(function () { try { if (map._mapPane) map.invalidateSize(); } catch (e) {} }, 80);
     return map;
@@ -126,7 +130,7 @@ const MapKit = (function () {
   /** Widget editor lengkap di dalam host. opts: {geom, kawasan, batas, onChange(geom|null, luas), maxChars, satelit, readonly} */
   function editor(host, opts) {
     opts = opts || {}; const maxChars = opts.maxChars || 40000;
-    host.innerHTML = (opts.readonly ? '' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('upload_file') + ' Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>') +
+    host.innerHTML = (opts.readonly ? '' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('edit_location') + ' Isi koordinat / Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>') +
       '<div class="mapbox"></div><div class="mapinfo" aria-live="polite"></div><div class="mapcheck"></div>';
     const box = host.querySelector('.mapbox'), info = host.querySelector('.mapinfo'), chk = host.querySelector('.mapcheck');
     const map = create(box, { satelit: opts.satelit, modal: opts.modal }); if (!map) return null;
