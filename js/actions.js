@@ -167,7 +167,7 @@ const ACT = {
   nav: function (el) { const it = navItems()[+el.dataset.i]; navigateTo(it.id, it.p || {}); },
   goTahap: function (el) { navigateTo('daftar', { tahap: el.dataset.t }); },
   goDaftar: function (el) { navigateTo('daftar', JSON.parse(el.dataset.p || '{}')); },
-  newForm: function () { S.wiz = null; navigateTo('form', {}); },
+  newForm: function () { if (S.me.peran !== 'mitra') return; S.wiz = null; navigateTo('form', {}); },
   editP: function (el) { S.wiz = null; navigateTo('form', { id: el.dataset.id }); },
   open: function (el) { navigateTo('detail', { id: el.dataset.id }); },
   back: function () { goBack('daftar'); },

@@ -149,12 +149,13 @@ function renderNav() {
   }).join('');
   const ini = initials(S.me.nama); $('tbAv').textContent = ini; $('ppAv').textContent = ini;
   $('tbName').textContent = S.me.nama; $('tbRole').textContent = S.me.peran_nama; $('ppName').textContent = S.me.nama; $('ppRole').textContent = S.me.peran_nama;
-  $('qaNew').hidden = !(S.me.peran === 'mitra' || S.me.peran === 'admin');
+  $('qaNew').hidden = S.me.peran !== 'mitra';
   const unread = S.notif.filter(function (n) { return !(n.dibaca === true || n.dibaca === 'TRUE'); }).length;
   const d = $('notifDot'); d.hidden = !unread; d.textContent = unread > 9 ? '9+' : unread;
 }
 function setTitle(t) { $('pageTitle').textContent = t; document.title = t + ' · SI-MITRA'; }
 function renderView() {
+  if (S.view === 'form' && !(S.params && S.params.id) && S.me && S.me.peran !== 'mitra') { S.view = 'dashboard'; S.params = {}; }
   MapKit.disposeAll();
   const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun, dokumen: vDokumen, statistik: vStatistik, peta: vPeta, verifikasi: vVerifikasi };
   (V[S.view] || vDashboard)();

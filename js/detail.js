@@ -88,7 +88,7 @@ function canUploadDoc(p) { if (FINAL.indexOf(p.status) > -1) return false; if (S
 function canEditP(p) { return S.me.peran !== 'prl' && S.me.peran !== 'uptd' && S.me.peran !== 'kepala_dkp' && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi') && (S.me.peran === 'admin' || p.id_user === S.me.id); }
 function tabsFor(p) {
   const t = [['ringkasan', 'Ringkasan'], ['dokumen', 'Dokumen']];
-  if (isStaff() || p.tahap > 3) t.push(['checklist', 'Checklist (L-III)']);
+  if (isStaff() || p.tahap > 3) t.push(['checklist', 'Checklist Administrasi (L-III)']);
   if (isStaff() || p.tahap > 4) t.push(['telaah', 'Telaah (L-IV/V)']);
   t.push(['peta', 'Peta Area']); t.push(['ba', 'BA & PKS']); if (p.tahap === 12 || (detData() && detData().monev.length)) t.push(['monev', 'Monev']); t.push(['riwayat', 'Riwayat']); return t;
 }
@@ -130,7 +130,7 @@ function tChecklist(p, d) {
   const items = S.master.persyaratan[p.jenis_mitra] || []; const edit = (S.me.peran === 'prl' || S.me.peran === 'admin') && p.tahap === 3 && FINAL.indexOf(p.status) === -1;
   const cl = {}; d.checklist.forEach(function (c) { cl[c.item] = c; });
   const done = items.filter(function (i) { return cl[i] && cl[i].status === 'Sesuai'; }).length;
-  return '<div class="card"><h3>Checklist persyaratan (Lampiran III)</h3><p class="sub">' + done + ' dari ' + items.length + ' persyaratan sesuai.</p>' + items.map(function (it, i) {
+  return '<div class="card"><h3>Checklist administrasi (Lampiran III)</h3><p class="sub">' + done + ' dari ' + items.length + ' persyaratan sesuai.</p><p class="hint" style="margin:4px 0 10px">Lampiran III adalah daftar periksa kelengkapan persyaratan administrasi yang diverifikasi PRL pada Tahap 3, sebelum usulan diteruskan ke verifikasi ruang/RPZ (Tahap 4). Tandai tiap persyaratan <b>Sesuai</b> atau <b>Tidak sesuai</b> berdasarkan berkas yang diunggah mitra.</p>' + (items.length ? '' : '<div class="callout warn">' + mi('warning') + '<span>Daftar persyaratan kosong karena jenis mitra pengajuan ini belum terisi. Periksa data pengajuan atau persyaratan di Data Master.</span></div>') + items.map(function (it, i) {
     const c = cl[it] || {}; const fs = d.berkas.filter(function (b) { return b.item === it; });
     return '<div class="ck"><div><div class="nm">' + esc(it) + '</div><div class="fl">' + (fs.length ? fs.map(function (b) { return fileChip(b, false); }).join('') : '<span class="t-sub">Belum ada berkas</span>') + '</div></div><div>' +
       (edit ? '<select class="in" data-ck="s" data-i="' + i + '"><option value="">— nilai —</option>' + NILAI.map(function (n) { return '<option' + (c.status === n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select><input class="in" style="margin-top:6px" data-ck="c" data-i="' + i + '" placeholder="Catatan" value="' + esc(c.catatan || '') + '">' : (c.status ? '<span class="chip ' + (c.status === 'Sesuai' ? 'c-ok' : 'c-warn') + '">' + esc(c.status) + '</span><div class="t-sub">' + esc(c.catatan || '') + '</div>' : '<span class="chip c-draft">Belum dinilai</span>')) + '</div></div>';

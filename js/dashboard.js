@@ -67,7 +67,7 @@ function vDaftar() {
   const title = S.params.aksi ? (S.me.peran === 'mitra' ? 'Perlu Dilengkapi' : 'Perlu Tindakan') : S.params.t1 ? 'Telaah & Verifikasi' : S.params.tahap === '12' ? 'Monitoring & Evaluasi' : (S.me.peran === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan'); setTitle(title);
   const kaw = S.master.kawasan.map(function (k) { return '<option value="' + esc(k.nama) + '"' + (S.f.kawasan === k.nama ? ' selected' : '') + '>' + esc(k.nama) + '</option>'; }).join('');
   const grups = ['Berjalan', 'Perlu dilengkapi', 'Pelaksanaan', 'Selesai', 'Tidak dilanjutkan'];
-  setView('<div class="ph"><div><h2>' + esc(title) + '</h2><p id="listCount"></p></div><div class="sp"></div>' + ((S.me.peran === 'mitra' || S.me.peran === 'admin') ? '<button class="btn btn-p" data-act="newForm">' + mi('add') + ' Ajukan Kemitraan</button>' : '') + '</div>' +
+  setView('<div class="ph"><div><h2>' + esc(title) + '</h2><p id="listCount"></p></div><div class="sp"></div>' + ((S.me.peran === 'mitra') ? '<button class="btn btn-p" data-act="newForm">' + mi('add') + ' Ajukan Kemitraan</button>' : '') + '</div>' +
     '<div class="card" style="margin-bottom:14px;padding:14px"><div class="filters">' +
     '<input id="fQ" class="in" type="search" placeholder="Cari nomor, judul, lembaga…" aria-label="Cari" value="' + esc(S.f.q) + '">' +
     '<select id="fS" class="in" aria-label="Status"><option value="">Semua status</option>' + grups.map(function (g) { return '<option' + (S.f.status === g ? ' selected' : '') + '>' + g + '</option>'; }).join('') + '</select>' +

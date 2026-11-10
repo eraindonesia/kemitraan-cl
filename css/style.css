@@ -465,3 +465,6 @@ body{background:var(--bg);-webkit-font-smoothing:antialiased}
 @media (max-width:767px){.prof-pop{position:fixed;right:10px;left:10px;width:auto;top:68px}.notif-pop{position:fixed;right:10px;left:10px;width:auto;top:68px}}
 .topbar .profile{min-width:48px;width:max-content}.topbar .profile .avatar{min-width:36px}
 @media (max-width:767px){.topbar .profile .avatar{display:grid}}
+
+.auth-l h1{text-transform:uppercase;font-size:34px;line-height:1.18;letter-spacing:-.3px}
+@media (max-width:1180px){.auth-l h1{font-size:28px}}
