@@ -88,14 +88,15 @@ const MapKit = (function () {
     if (!window.L) { el.innerHTML = '<div class="empty">' + mi('map') + 'Pustaka peta gagal dimuat.</div>'; return null; }
     L.Icon.Default.imagePath = 'vendor/leaflet/images/';
     const map = L.map(el, { center: CENTER, zoom: ZOOM, zoomControl: true, attributionControl: true, scrollWheelZoom: opts.scroll !== false, tap: true, zoomAnimation: false, markerZoomAnimation: false });
+    const ATTR_ESRI = 'Tiles &copy; Esri, HERE, Garmin, OpenStreetMap contributors';
+    const jalan = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: ATTR_ESRI });
     const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; kontributor <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>' });
     const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Citra &copy; Esri, Maxar, Earthstar Geographics' });
-    const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap, &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>' });
-    let cur = opts.satelit ? sat : osm; cur.addTo(map);
-    let nerr = 0; osm.on('tileerror', function () { // OSM menolak/gagal → pindah otomatis ke CARTO
-      if (++nerr === 4 && map.hasLayer(osm)) { map.removeLayer(osm); carto.addTo(map); }
+    (opts.satelit ? sat : jalan).addTo(map);
+    let nerr = 0; jalan.on('tileerror', function () { // Esri gagal → pindah otomatis ke OSM
+      if (++nerr === 4 && map.hasLayer(jalan)) { map.removeLayer(jalan); osm.addTo(map); }
     });
-    L.control.layers({ 'Peta jalan (OSM)': osm, 'Peta terang (CARTO)': carto, 'Citra satelit': sat }, null, { collapsed: true }).addTo(map);
+    L.control.layers({ 'Peta jalan (Esri)': jalan, 'OpenStreetMap': osm, 'Citra satelit': sat }, null, { collapsed: true }).addTo(map);
     L.control.scale({ imperial: false }).addTo(map);
     (opts.modal ? liveModal : live).push(map); setTimeout(function () { try { if (map._mapPane) map.invalidateSize(); } catch (e) {} }, 80);
     return map;
