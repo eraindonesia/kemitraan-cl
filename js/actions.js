@@ -126,7 +126,8 @@ function vMaster() {
   setView('<div class="ph"><div><h2>Data master</h2><p>Kawasan, persyaratan per jenis mitra, dan kontak bantuan.</p></div><div class="sp"></div><button class="btn btn-p" data-act="saveMaster">' + mi('save') + ' Simpan semua</button></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Kawasan konservasi</h3><p class="sub">Satu baris per kawasan. Format: <code>Nama | Dasar hukum | Zona1; Zona2</code></p><textarea class="in" id="mKaw" rows="6">' + esc(m.kawasan.map(function (k) { return k.nama + ' | ' + (k.dasar || '') + ' | ' + k.zona.join('; '); }).join('\n')) + '</textarea></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Persyaratan per jenis mitra</h3><p class="sub">Satu persyaratan per baris.</p>' + m.jenis.map(function (j) { return '<div class="fld"><label>' + esc(j.nama) + '</label><textarea class="in" rows="3" data-mj="' + esc(j.kode) + '">' + esc((m.persyaratan[j.kode] || []).join('\n')) + '</textarea></div>'; }).join('') + '</div>' +
-    '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div></div>');
+    batasCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div></div>');
+  fillBatas();
 }
 function saveMaster(btn) {
   const kaw = $('mKaw').value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) { const p = l.split('|'); return { nama: (p[0] || '').trim(), dasar: (p[1] || '').trim(), zona: (p[2] || '').split(';').map(function (z) { return z.trim(); }).filter(Boolean) }; });
@@ -152,6 +153,7 @@ function openVerif() {
 }
 
 /* ----------------------------- Delegasi event ----------------------------- */
+const CHG = {};
 const ACT = {
   'auth-tab': function (el) { const l = el.dataset.v === 'login'; $('formLogin').hidden = !l; $('formReg').hidden = l; $('tabLogin').classList.toggle('on', l); $('tabReg').classList.toggle('on', !l); },
   togglePw: function (el) { const i = el.parentNode.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; },
@@ -198,7 +200,7 @@ function bindEvents() {
     const t = e.target;
     if (t.dataset.f !== undefined && S.wiz) { S.wiz.data[t.dataset.f] = t.value; if (!S.wiz.editId) LS.set('sm_form', S.wiz.data); if (t.dataset.f === 'kawasan') { S.wiz.data.zona = ''; renderWiz(); } }
     if (t.dataset.ck || t.dataset.tp || t.dataset.ba) S.dirty = true;
-    if (t.dataset.chg === 'upload') uploadFile(t);
+    if (t.dataset.chg === 'upload') uploadFile(t); else if (t.dataset.chg && CHG[t.dataset.chg]) CHG[t.dataset.chg](t);
   });
   /* Prefetch detail saat hover/sentuh (Instant UX) */
   const pf = debounce(function (id) { prefetch(id); }, 70);
@@ -207,6 +209,7 @@ function bindEvents() {
     const q = this.value; if (S.view === 'daftar') { S.f.q = q; S.f.page = 1; const fq = $('fQ'); if (fq) fq.value = q; renderList(); } else if (q) { navigateTo('daftar', { q: q }); }
   }, 150));
   bindAuth();
+  document.addEventListener('error', function (e) { const t = e.target; if (t && t.tagName === 'IMG' && t.classList.contains('logo-img') && !t.dataset.fb) { t.dataset.fb = '1'; t.src = LOGO_FALLBACK; } }, true);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
   ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, function () { lastAct = Date.now(); }, { passive: true }); });
   pollLoop();
@@ -223,6 +226,8 @@ function refresh() {
   if (!S.token || S.pending > 0) return Promise.resolve();
   return api('me').then(function (r) {
     if (S.pending > 0) return; hydrate(r); persist(); renderNav();
+    const sig = S.daftar.length + '|' + S.daftar.map(function (p) { return p.diubah; }).sort().pop() + '|' + (S.timeline[0] && S.timeline[0].id) + '|' + S.notif.length + '|' + S.monev.length;
+    if (sig === S._sig) return; S._sig = sig;
     if (S.view === 'dashboard') vDashboard(); else if (S.view === 'daftar') renderList();
     else if (S.view === 'detail') { const c = S.det[S.params.id]; if (!c || Date.now() - c.t > 20000) loadDetail(S.params.id); }
   }).catch(function () {});
@@ -234,7 +239,7 @@ function init() {
   applyTheme(); bindEvents();
   try { document.fonts.load('20px "Material Symbols Outlined"').then(function () { document.documentElement.classList.add('icons-ok'); }); setTimeout(function () { if (document.fonts.check('20px "Material Symbols Outlined"')) document.documentElement.classList.add('icons-ok'); }, 2500); } catch (e) { document.documentElement.classList.add('icons-ok'); }
   const tok = LS.get('sm_tok'), snap = LS.get('sm_snap'); const pub = LS.get('sm_pub');
-  if (tok && snap && snap.me) { S.token = tok; hydrate(snap); showApp(); navigateTo('dashboard', {}, { replace: true }); refresh(); }
+  if (tok && snap && snap.me) { S.token = tok; hydrate(snap); S.peta = LS.get('sm_peta'); showApp(); navigateTo('dashboard', {}, { replace: true }); refresh(); }
   else { if (pub) S.master = pub; showAuth(); loadPublicMaster(); }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

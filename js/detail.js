@@ -11,6 +11,7 @@ function vForm() {
   renderWiz();
 }
 function renderWiz() {
+  MapKit.disposeAll(); S.wizEd = null;
   const w = S.wiz, d = w.data, st = w.step; const f = function (k) { return esc(d[k] === undefined ? '' : d[k]); };
   let c = '';
   if (st === 0) {
@@ -25,6 +26,7 @@ function renderWiz() {
     c = '<div class="row2"><div class="fld"><label>Kawasan konservasi <i>*</i></label><select class="in" data-f="kawasan"><option value="">Pilih kawasan…</option>' + S.master.kawasan.map(function (x) { return '<option' + (d.kawasan === x.nama ? ' selected' : '') + '>' + esc(x.nama) + '</option>'; }).join('') + '</select></div>' +
       '<div class="fld"><label>Zona <i>*</i></label><select class="in" data-f="zona"><option value="">Pilih zona…</option>' + zs.map(function (z) { return '<option' + (d.zona === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="fld"><label>Lokasi / area kegiatan <i>*</i></label><input class="in" data-f="lokasi" value="' + f('lokasi') + '"></div><div class="fld"><label>Luas area</label><input class="in" data-f="luas" placeholder="mis. 25 Ha" value="' + f('luas') + '"></div>';
+    if (!w.editId) { c += '<div class="fld"><label>Area pengelolaan (opsional)</label><p class="hint">Gambar poligon area yang diusulkan, atau impor GeoJSON / daftar koordinat. Dapat ditambah atau diubah nanti pada tab Peta Area.</p><div id="wizMap"></div></div>'; setTimeout(wizMapInit, 0); }
   } else if (st === 3) {
     c = '<div class="row2"><div class="fld"><label>Total rencana anggaran (Rp)</label><input class="in" type="number" min="0" data-f="biaya" value="' + f('biaya') + '"></div><div class="fld"><label>Sumber pembiayaan</label><input class="in" data-f="sumber" placeholder="Swadaya / CSR / hibah…" value="' + f('sumber') + '"></div></div>' +
       '<div class="callout info">' + mi('attach_file') + '<span>Dokumen persyaratan diunggah pada halaman detail setelah draft disimpan.</span></div>';
@@ -32,10 +34,17 @@ function renderWiz() {
     const req = (S.master.persyaratan[S.me.jenis_mitra] || []);
     c = '<dl class="kv"><dt>Judul</dt><dd>' + f('judul') + '</dd><dt>Kawasan / zona</dt><dd>' + f('kawasan') + ' / ' + f('zona') + '</dd><dt>Lokasi</dt><dd>' + f('lokasi') + ' (' + f('luas') + ')</dd><dt>Jangka</dt><dd>' + f('jangka') + '</dd><dt>Anggaran</dt><dd>' + rp(d.biaya) + ' · ' + f('sumber') + '</dd><dt>Uraian</dt><dd>' + f('uraian') + '</dd></dl>' +
       (req.length && S.me.peran === 'mitra' ? '<h3 style="margin:16px 0 6px">Dokumen yang perlu disiapkan</h3><ul style="padding-left:18px;color:var(--tx-2)">' + req.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' : '');
+    if (d.area && d.area.geojson) c += '<p class="t-sub" style="margin-top:10px">Area peta: ' + numID(MapKit.areaHa(MapKit.parse(d.area.geojson))) + ' Ha</p>';
   }
   $('wizBox').innerHTML = '<div class="wiz-h">' + WSTEPS.map(function (s, i) { return '<span class="' + (i <= st ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</span>'; }).join('') + '</div><div class="wiz">' + WSTEPS.map(function (s, i) { return '<div class="' + (i <= st ? 'on' : '') + '"></div>'; }).join('') + '</div>' + c +
     '<div id="wErr" class="errtxt" role="alert"></div><div class="act-bar" style="position:static;box-shadow:none;border:0;padding:12px 0 0"><button class="btn btn-o" data-act="wBack">' + (st ? 'Kembali' : 'Batal') + '</button><div class="sp"></div>' +
     (st === 4 ? '<button class="btn btn-p" data-act="wSave">' + mi('save') + ' ' + (w.editId ? 'Simpan perubahan' : 'Simpan draft') + '</button>' : '<button class="btn btn-p" data-act="wNext">Lanjut ' + mi('arrow_forward') + '</button>') + '</div>';
+}
+function wizMapInit() {
+  const el = $('wizMap'); if (!el || S.view !== 'form' || !S.wiz || S.wiz.step !== 2) return; const d = S.wiz.data;
+  const ed = MapKit.editor(el, { geom: d.area && d.area.geojson, kawasan: d.kawasan, batas: S.peta ? S.peta.batas : [], maxChars: 40000,
+    onChange: function (g) { d.area = g ? { nama: 'Area 1', geojson: g } : null; LS.set('sm_form', d); } });
+  S.wizEd = ed; if (!S.peta && ed) loadPeta().then(function () { if (S.wizEd === ed) ed.setBatas(S.peta.batas); }).catch(function () {});
 }
 function wizValidate(st) {
   const d = S.wiz.data;
@@ -56,7 +65,7 @@ function wizSave() {
   const tmp = { id: 'tmp_' + Date.now(), nomor: 'Menyimpan…', id_user: S.me.id, lembaga: S.me.lembaga, jenis_mitra: S.me.jenis_mitra, judul: d.judul, kawasan: d.kawasan, zona: d.zona, lokasi: d.lokasi, luas: d.luas || '', uraian: d.uraian, biaya: d.biaya, sumber: d.sumber || '', jangka: d.jangka || '', tahap: 1, status: 'Draft', dibuat: now, diubah: now, diubah_oleh: S.me.nama, _pending: true };
   S.daftar.unshift(tmp); LS.del('sm_form'); S.wiz = null; toast('ok', 'Draft dibuat, sedang disimpan ke server…'); navigateTo('daftar', {}, { replace: true });
   bg('Buat pengajuan', function () {
-    return api('buat', d).then(function (p) { S.daftar = S.daftar.filter(function (x) { return x.id !== tmp.id; }); S.daftar.unshift(p); toast('ok', 'Draft tersimpan: ' + p.nomor); if (S.view === 'daftar') renderList(); else if (S.view === 'dashboard') vDashboard(); renderNav(); });
+    return api('buat', d).then(function (p) { S.daftar = S.daftar.filter(function (x) { return x.id !== tmp.id; }); S.daftar.unshift(p); S.peta = null; toast('ok', 'Draft tersimpan: ' + p.nomor); if (S.view === 'daftar') renderList(); else if (S.view === 'dashboard') vDashboard(); renderNav(); });
   }, function () { S.daftar = S.daftar.filter(function (x) { return x.id !== tmp.id; }); LS.set('sm_form', d); if (S.view === 'daftar') renderList(); });
 }
 
@@ -81,9 +90,10 @@ function tabsFor(p) {
   const t = [['ringkasan', 'Ringkasan'], ['dokumen', 'Dokumen']];
   if (isStaff() || p.tahap > 3) t.push(['checklist', 'Checklist (L-III)']);
   if (isStaff() || p.tahap > 4) t.push(['telaah', 'Telaah (L-IV/V)']);
-  t.push(['ba', 'BA & PKS']); if (p.tahap === 12 || (detData() && detData().monev.length)) t.push(['monev', 'Monev']); t.push(['riwayat', 'Riwayat']); return t;
+  t.push(['peta', 'Peta Area']); t.push(['ba', 'BA & PKS']); if (p.tahap === 12 || (detData() && detData().monev.length)) t.push(['monev', 'Monev']); t.push(['riwayat', 'Riwayat']); return t;
 }
 function renderDetailBody() {
+  MapKit.disposeAll();
   const p = pById(S.params.id); if (!p) return; const d = detData();
   $('dTitle').textContent = p.judul; $('dSub').textContent = p.nomor + ' · ' + p.lembaga + ' · ' + p.kawasan; $('dChip').innerHTML = chip(p);
   const tabs = tabsFor(p); if (!tabs.some(function (t) { return t[0] === S.tab; })) S.tab = 'ringkasan';
@@ -91,12 +101,13 @@ function renderDetailBody() {
   const ops = opsiFor(p);
   const bar = ops.length || canEditP(p) ? '<div class="act-bar"><span class="t-sub">' + mi('bolt', 'font-size:16px') + ' Tahap ' + p.tahap + ': ' + esc(stageName(p.tahap)) + '</span><div class="sp"></div>' + (canEditP(p) ? '<button class="btn btn-o" data-act="editP" data-id="' + esc(p.id) + '">' + mi('edit') + ' Ubah data</button>' : '') + ops.map(function (t) { const bad = /Tidak/.test(t.k); return '<button class="btn ' + (bad ? 'btn-w' : 'btn-p') + '" data-act="maju" data-k="' + esc(t.k) + '">' + esc(t.k) + '</button>'; }).join('') + '</div>' : '';
   $('dBody').innerHTML = stepper + '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button class="' + (S.tab === t[0] ? 'on' : '') + '" role="tab" data-act="tab" data-t="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="tabBody">' + tabHtml(p, d) + '</div>' + bar;
+  afterDetailRender();
 }
 function skel() { return '<div class="card"><div class="sk" style="width:40%;margin-bottom:12px"></div><div class="sk" style="margin-bottom:8px"></div><div class="sk" style="width:80%;margin-bottom:8px"></div><div class="sk" style="width:60%"></div></div>'; }
 function tabHtml(p, d) {
   if (S.tab === 'ringkasan') return tRingkasan(p, d);
   if (!d) return skel();
-  return ({ dokumen: tDokumen, checklist: tChecklist, telaah: tTelaah, ba: tBA, monev: tMonev, riwayat: tRiwayat }[S.tab] || tRingkasan)(p, d);
+  return ({ dokumen: tDokumen, checklist: tChecklist, telaah: tTelaah, ba: tBA, monev: tMonev, riwayat: tRiwayat, peta: tPeta }[S.tab] || tRingkasan)(p, d);
 }
 function tRingkasan(p, d) {
   let warn = '';

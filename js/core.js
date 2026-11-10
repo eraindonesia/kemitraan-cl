@@ -19,6 +19,7 @@ const JENIS_FALLBACK = [
 ];
 const SHORT = ['Koordinasi', 'Permohonan', 'Verif. Adm', 'Ruang & RPZ', 'Penilaian', 'Pemaparan', 'Penelaahan', 'Kesepakatan', 'Draft PKS', 'Lapor Gub.', 'TTD PKS', 'Monev'];
 const FINAL = ['Tidak dilanjutkan', 'Selesai'];
+const LOGO_FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e8f94'/%3E%3Cpath d='M8 21h16l-3 4H11zM16 6v13M16 8l7 10h-7z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E";
 const NILAI = ['Sesuai', 'Perlu Perbaikan', 'Tidak Sesuai'];
 
 const S = {
@@ -83,12 +84,12 @@ function toast(kind, msg) {
   t.querySelector('.x').onclick = function () { t.remove(); };
   $('toasts').appendChild(t); setTimeout(function () { t.remove(); }, kind === 'bad' ? 6500 : 3200);
 }
-function closeModal() { $('modalRoot').innerHTML = ''; document.removeEventListener('keydown', escClose); }
+function closeModal() { $('modalRoot').innerHTML = ''; document.removeEventListener('keydown', escClose); if (window.MapKit) MapKit.disposeModal(); }
 function escClose(e) { if (e.key === 'Escape') closeModal(); }
 /** modal({title, body, ok, danger, hideCancel, onOk(root) -> Promise|void}) */
 function modal(o) {
   const root = $('modalRoot');
-  root.innerHTML = '<div class="modal-bg" data-act="modalBg"><div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '"><h3>' + esc(o.title) + '</h3>' +
+  root.innerHTML = '<div class="modal-bg" data-act="modalBg"><div class="modal' + (o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '"><h3>' + esc(o.title) + '</h3>' +
     (o.sub ? '<p class="sub" style="color:var(--tx-3);margin-bottom:10px">' + o.sub + '</p>' : '') + '<div id="mBody">' + (o.body || '') + '</div><div id="mErr" class="errtxt" role="alert" style="margin-top:8px"></div>' +
     '<div class="btns">' + (o.hideCancel ? '' : '<button class="btn btn-o" data-act="closeModal">Batal</button>') +
     (o.ok ? '<button class="btn ' + (o.danger ? 'btn-d' : 'btn-p') + '" id="mOk">' + esc(o.ok) + '</button>' : '<button class="btn btn-o" data-act="closeModal">Tutup</button>') + '</div></div></div>';
@@ -122,34 +123,41 @@ function openNav() { $('sidebar').classList.add('open'); $('scrim').classList.ad
 function closeNav() { $('sidebar').classList.remove('open'); $('scrim').classList.remove('show'); }
 function closePop() { const p = $('notifPop'); if (p) p.hidden = true; }
 
+function pkey(p) { p = p || {}; return [p.aksi ? 1 : 0, p.tahap || '', p.t1 || ''].join('|'); }
 function navItems() {
-  const r = S.me.peran; const a = [{ id: 'dashboard', ic: 'dashboard', t: 'Dasbor' }];
-  a.push({ id: 'daftar', ic: 'folder_open', t: r === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan', p: {} });
-  if (r === 'mitra' || r === 'admin') a.push({ id: 'form', ic: 'add_circle', t: 'Ajukan Kemitraan' });
-  if (r !== 'mitra' && r !== 'admin') a.push({ id: 'daftar', ic: 'pending_actions', t: 'Perlu Tindakan', p: { aksi: 1 }, badge: S.daftar.filter(needsAction).length });
-  if (r === 'mitra') a.push({ id: 'daftar', ic: 'pending_actions', t: 'Perlu Dilengkapi', p: { aksi: 1 }, badge: S.daftar.filter(needsAction).length });
+  const r = S.me.peran, n = S.daftar.filter(needsAction).length; const a = [{ grp: 'Navigasi utama' }];
+  a.push({ id: 'dashboard', ic: 'dashboard', t: 'Dashboard' });
+  a.push({ id: 'daftar', ic: 'list_alt', t: r === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan', p: {} });
+  if (r === 'mitra' || r === 'admin') a.push({ id: 'form', ic: 'edit_document', t: 'Ajukan Kemitraan' });
+  if (r === 'mitra') a.push({ id: 'daftar', ic: 'pending_actions', t: 'Perlu Dilengkapi', p: { aksi: 1 }, badge: n });
+  else a.push({ id: 'daftar', ic: 'fact_check', t: 'Telaah & Verifikasi', p: { t1: 3, t2: 8 }, badge: n });
+  a.push({ id: 'dokumen', ic: 'description', t: 'Berita Acara & PKS' });
   a.push({ id: 'daftar', ic: 'monitoring', t: 'Monitoring & Evaluasi', p: { tahap: '12' } });
-  if (r === 'admin') { a.push({ grp: 'Administrasi' }); a.push({ id: 'users', ic: 'group', t: 'Pengguna' }); a.push({ id: 'master', ic: 'tune', t: 'Data Master' }); }
-  a.push({ grp: 'Akun' }); a.push({ id: 'akun', ic: 'manage_accounts', t: 'Pengaturan Akun' });
+  a.push({ id: 'peta', ic: 'map', t: 'Peta Kawasan' });
+  a.push({ id: 'statistik', ic: 'bar_chart', t: 'Laporan & Statistik' });
+  a.push({ grp: 'Tata kelola' });
+  if (r === 'admin') { a.push({ id: 'users', ic: 'group', t: 'Manajemen Pengguna' }); a.push({ id: 'master', ic: 'tune', t: 'Data Master & Batas' }); }
+  a.push({ id: 'verifikasi', ic: 'verified_user', t: 'Verifikasi Dokumen' });
+  a.push({ id: 'akun', ic: 'manage_accounts', t: 'Pengaturan Akun' });
   return a;
 }
-function navActive(it) {
-  if (it.grp) return false; if (it.id !== S.view) return false;
-  if (it.id === 'daftar') { const p = it.p || {}; return (!!p.aksi === !!S.params.aksi) && ((p.tahap || '') === (S.params.tahap || '')); }
-  return true;
-}
+function navActive(it) { if (it.grp || it.id !== S.view) return false; if (it.id === 'daftar') return pkey(it.p) === pkey(S.params); return true; }
 function renderNav() {
   $('nav').innerHTML = navItems().map(function (it, i) {
     if (it.grp) return '<div class="grp">' + esc(it.grp) + '</div>';
     return '<button class="' + (navActive(it) ? 'on' : '') + '" data-act="nav" data-i="' + i + '">' + mi(it.ic) + '<span>' + esc(it.t) + '</span>' + (it.badge ? '<span class="badge">' + it.badge + '</span>' : '') + '</button>';
   }).join('');
-  $('sbAv').textContent = initials(S.me.nama); $('sbName').textContent = S.me.nama; $('sbRole').textContent = S.me.peran_nama;
+  const ini = initials(S.me.nama); $('sbAv').textContent = ini; $('tbAv').textContent = ini;
+  $('sbName').textContent = S.me.nama; $('sbRole').textContent = S.me.peran_nama; $('tbName').textContent = S.me.nama; $('tbRole').textContent = S.me.peran_nama;
+  $('monthChip').lastElementChild.textContent = new Date().toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+  $('qaNew').hidden = !(S.me.peran === 'mitra' || S.me.peran === 'admin');
   const unread = S.notif.filter(function (n) { return !(n.dibaca === true || n.dibaca === 'TRUE'); }).length;
   const d = $('notifDot'); d.hidden = !unread; d.textContent = unread > 9 ? '9+' : unread;
 }
 function setTitle(t) { $('pageTitle').textContent = t; document.title = t + ' · SI-MITRA'; }
 function renderView() {
-  const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun };
+  MapKit.disposeAll();
+  const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun, dokumen: vDokumen, statistik: vStatistik, peta: vPeta, verifikasi: vVerifikasi };
   (V[S.view] || vDashboard)();
 }
 function setView(html) { $('view').innerHTML = html; }

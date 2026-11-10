@@ -8,7 +8,7 @@ function showAuth() {
 }
 function showApp() { $('authScreen').hidden = true; $('appShell').hidden = false; applyTheme(); }
 function forceLogout(msg) {
-  S.token = null; S.me = null; LS.del('sm_tok'); LS.del('sm_snap'); S.det = {}; S.stack = []; S.view = '';
+  S.token = null; S.me = null; S.peta = null; S.dok = null; S._sig = null; LS.del('sm_tok'); LS.del('sm_snap'); LS.del('sm_peta'); LS.del('sm_form'); S.det = {}; S.stack = []; S.view = '';
   showAuth(); if (msg) $('lgErr').textContent = msg;
 }
 function afterAuth(r) {
@@ -43,33 +43,6 @@ function groupOf(p) {
   if (p.status === 'Tidak dilanjutkan') return 'Tidak dilanjutkan'; if (p.status === 'Selesai') return 'Selesai';
   if (p.status === 'Perlu dilengkapi') return 'Perlu dilengkapi'; if (p.tahap === 12) return 'Pelaksanaan'; return 'Berjalan';
 }
-function vDashboard() {
-  setTitle('Dasbor'); const D = S.daftar; const aksi = D.filter(needsAction);
-  const cnt = function (g) { return D.filter(function (p) { return groupOf(p) === g; }).length; };
-  const kpis = [
-    { t: 'Total pengajuan', v: D.length, ic: 'description', c: 'var(--blue-l)', cc: 'var(--blue)', go: {} },
-    { t: 'Sedang berjalan', v: cnt('Berjalan') + cnt('Perlu dilengkapi'), ic: 'autorenew', c: 'var(--teal-l)', cc: 'var(--teal-d)', go: { grup: 'Berjalan' } },
-    { t: S.me.peran === 'mitra' ? 'Perlu Anda lengkapi' : 'Perlu tindakan Anda', v: aksi.length, ic: 'pending_actions', c: 'var(--amber-l)', cc: '#a56a06', go: { aksi: 1 } },
-    { t: 'Pelaksanaan / selesai', v: cnt('Pelaksanaan') + cnt('Selesai'), ic: 'verified', c: 'var(--green-l)', cc: 'var(--green-d)', go: { tahap: '12' } }
-  ];
-  const pipe = S.master.stages.map(function (s, i) { const n = D.filter(function (p) { return p.tahap === s.no && FINAL.indexOf(p.status) === -1; }).length; return '<button class="' + (n ? 'has' : 'zero') + '" data-act="goTahap" data-t="' + s.no + '" title="' + esc(s.nama) + '"><b>' + n + '</b><span>' + (i + 1) + '. ' + esc(SHORT[i]) + '</span></button>'; }).join('');
-  const kw = {}; D.forEach(function (p) { kw[p.kawasan] = (kw[p.kawasan] || 0) + 1; });
-  const kwKeys = Object.keys(kw).sort(function (a, b) { return kw[b] - kw[a]; }); const mx = Math.max(1, kw[kwKeys[0]] || 1);
-  const bars = kwKeys.length ? kwKeys.map(function (k) { return '<div class="brow"><span title="' + esc(k) + '">' + esc(k) + '</span><div class="bt"><i style="width:' + (kw[k] / mx * 100) + '%"></i></div><b>' + kw[k] + '</b></div>'; }).join('') : '<div class="empty" style="padding:18px">Belum ada data.</div>';
-  const grp = [['Berjalan', 'var(--teal)'], ['Perlu dilengkapi', 'var(--amber)'], ['Pelaksanaan', 'var(--green)'], ['Selesai', 'var(--blue)'], ['Tidak dilanjutkan', 'var(--red)']];
-  const tot = Math.max(1, D.length); let off = 0; const R = 52, C = 2 * Math.PI * R;
-  const arcs = grp.map(function (g) { const n = cnt(g[0]); const len = n / tot * C; const s = '<circle r="' + R + '" cx="65" cy="65" fill="none" stroke="' + g[1] + '" stroke-width="16" stroke-dasharray="' + len + ' ' + (C - len) + '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 65 65)"/>'; off += len; return s; }).join('');
-  const leg = grp.map(function (g) { return '<div><i style="background:' + g[1] + '"></i>' + g[0] + ' <b>' + cnt(g[0]) + '</b></div>'; }).join('');
-  const act = aksi.slice(0, 6).map(function (p) { return '<div class="it" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer" data-act="open" data-id="' + esc(p.id) + '"><div style="flex:1;min-width:0"><div class="t-b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.judul) + '</div><div class="t-sub">' + esc(p.nomor) + ' · Tahap ' + p.tahap + ' · ' + esc(p.lembaga) + '</div></div>' + chip(p) + '</div>'; }).join('') || '<div class="empty" style="padding:22px">' + mi('task_alt') + 'Tidak ada tindakan tertunda.</div>';
-  const tl = S.timeline.slice(0, 8).map(function (r) { const p = pById(r.id_pengajuan); const bad = /Tidak/.test(r.keputusan); return '<div class="it ' + (bad ? 'bad' : '') + '"><b>' + esc(r.keputusan) + '</b> · ' + esc(p ? p.nomor : '') + '<small>' + esc(r.pelaku) + ' · ' + ago(r.waktu) + '</small>' + (r.catatan ? '<div class="note">' + esc(r.catatan) + '</div>' : '') + '</div>'; }).join('') || '<div class="empty" style="padding:18px">Belum ada aktivitas.</div>';
-  setView('<div class="ph"><div><h2>Halo, ' + esc(S.me.nama.split(' ')[0]) + '</h2><p>' + esc(S.me.peran_nama) + (S.me.lembaga ? ' · ' + esc(S.me.lembaga) : '') + '</p></div><div class="sp"></div>' +
-    ((S.me.peran === 'mitra' || S.me.peran === 'admin') ? '<button class="btn btn-p" data-act="newForm">' + mi('add') + ' Ajukan Kemitraan</button>' : '') + '</div>' +
-    '<div class="grid g4" style="margin-bottom:16px">' + kpis.map(function (k) { return '<button class="card kpi" data-act="goDaftar" data-p=\'' + esc(JSON.stringify(k.go)) + '\'><div class="ic" style="background:' + k.c + ';color:' + k.cc + '">' + mi(k.ic) + '</div><div><b>' + k.v + '</b><span>' + esc(k.t) + '</span></div></button>'; }).join('') + '</div>' +
-    '<div class="card" style="margin-bottom:16px"><h3>Alur 12 tahap kemitraan</h3><p class="sub">Jumlah pengajuan aktif pada setiap tahap. Klik untuk menyaring.</p><div class="pipe">' + pipe + '</div></div>' +
-    '<div class="grid g-main" style="margin-bottom:16px"><div class="card"><h3>' + (S.me.peran === 'mitra' ? 'Perlu Anda lengkapi' : 'Perlu tindakan Anda') + '</h3><p class="sub">Urut berdasarkan pembaruan terbaru.</p>' + act + '</div>' +
-    '<div class="card"><h3>Status pengajuan</h3><p class="sub">Komposisi seluruh pengajuan.</p><div class="donut"><svg viewBox="0 0 130 130" role="img" aria-label="Diagram status">' + (D.length ? arcs : '<circle r="52" cx="65" cy="65" fill="none" stroke="var(--line)" stroke-width="16"/>') + '<text x="65" y="70" text-anchor="middle" font-size="22" font-weight="800" fill="currentColor">' + D.length + '</text></svg><div class="leg">' + leg + '</div></div></div></div>' +
-    '<div class="grid g-main"><div class="card bars"><h3>Per kawasan konservasi</h3><p class="sub">Jumlah pengajuan.</p>' + bars + '</div><div class="card"><h3>Aktivitas terbaru</h3><p class="sub">Jejak keputusan terakhir.</p><div class="tl">' + tl + '</div></div></div>');
-}
 
 /* ----------------------------- Daftar pengajuan ----------------------------- */
 function applyParams() {
@@ -79,6 +52,7 @@ function listData() {
   const f = S.f; const q = f.q.toLowerCase().trim();
   let a = S.daftar.filter(function (p) {
     if (S.params.aksi && !needsAction(p)) return false;
+    if (S.params.t1 && (p.tahap < S.params.t1 || p.tahap > S.params.t2)) return false;
     if (q && (p.nomor + ' ' + p.judul + ' ' + p.lembaga + ' ' + p.kawasan).toLowerCase().indexOf(q) === -1) return false;
     if (f.status && groupOf(p) !== f.status) return false;
     if (f.kawasan && p.kawasan !== f.kawasan) return false;
@@ -90,7 +64,7 @@ function listData() {
 }
 function vDaftar() {
   if (!S._keepF) applyParams(); S._keepF = false;
-  const title = S.params.aksi ? (S.me.peran === 'mitra' ? 'Perlu Dilengkapi' : 'Perlu Tindakan') : S.params.tahap === '12' ? 'Monitoring & Evaluasi' : (S.me.peran === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan'); setTitle(title);
+  const title = S.params.aksi ? (S.me.peran === 'mitra' ? 'Perlu Dilengkapi' : 'Perlu Tindakan') : S.params.t1 ? 'Telaah & Verifikasi' : S.params.tahap === '12' ? 'Monitoring & Evaluasi' : (S.me.peran === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan'); setTitle(title);
   const kaw = S.master.kawasan.map(function (k) { return '<option value="' + esc(k.nama) + '"' + (S.f.kawasan === k.nama ? ' selected' : '') + '>' + esc(k.nama) + '</option>'; }).join('');
   const grups = ['Berjalan', 'Perlu dilengkapi', 'Pelaksanaan', 'Selesai', 'Tidak dilanjutkan'];
   setView('<div class="ph"><div><h2>' + esc(title) + '</h2><p id="listCount"></p></div><div class="sp"></div>' + ((S.me.peran === 'mitra' || S.me.peran === 'admin') ? '<button class="btn btn-p" data-act="newForm">' + mi('add') + ' Ajukan Kemitraan</button>' : '') + '</div>' +

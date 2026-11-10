@@ -6,7 +6,7 @@
  * - Timeout, pesan galat ramah, logout otomatis saat sesi habis
  * ===================================================================== */
 'use strict';
-const READ_ACTIONS = /^(me|boot|daftar|detail|master|daftar_user|berkas_ambil)$/;
+const READ_ACTIONS = /^(me|boot|daftar|detail|master|daftar_user|berkas_ambil|peta|dokumen_list)$/;
 const inflight = {};
 let writeEpoch = 0;
 
