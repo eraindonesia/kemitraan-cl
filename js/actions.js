@@ -107,12 +107,55 @@ function deleteFile(id) {
 }
 
 /* ----------------------------- Admin: pengguna ----------------------------- */
+function googleCard() {
+  const a = authCfg(); const on = !!a.gid;
+  return '<div class="card gcfg" style="margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><h3 style="margin:0">Login dengan Google</h3><p class="sub" style="margin-top:4px">' + (on ? (a.pw ? 'Aktif — mode peralihan: Google <b>dan</b> kata sandi diizinkan.' : 'Aktif — hanya akun Google yang dapat masuk.') : 'Belum aktif. Saat ini pengguna masuk dengan email &amp; kata sandi.') + '</p></div><span class="chip ' + (on ? 'c-ok' : 'c-bad') + '">' + (on ? 'Aktif' : 'Belum aktif') + '</span><button class="btn btn-o" data-act="gAtur">' + mi('settings') + ' ' + (on ? 'Atur' : 'Aktifkan') + '</button></div>';
+}
 function vUsers() {
-  setTitle('Pengguna'); setView('<div class="ph"><div><h2>Manajemen pengguna</h2><p>Kelola akun internal dan mitra.</p></div><div class="sp"></div><button class="btn btn-p" data-act="addUser">' + mi('person_add') + ' Tambah pengguna</button></div><div id="uBody">' + skel() + '</div>');
+  setTitle('Pengguna'); setView('<div class="ph"><div><h2>Manajemen pengguna</h2><p>Kelola akun internal dan mitra.</p></div><div class="sp"></div><button class="btn btn-p" data-act="addUser">' + mi('person_add') + ' Tambah pengguna</button></div><div id="uCfg">' + googleCard() + '</div><div id="uBody">' + skel() + '</div>');
   const draw = function () {
-    $('uBody').innerHTML = '<div class="tbl-wrap"><table><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Lembaga</th><th>Status</th><th></th></tr></thead><tbody>' + S.users.map(function (u) { return '<tr style="cursor:default"><td class="t-b">' + esc(u.nama) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.peran_nama) + '</td><td>' + esc(u.lembaga) + '</td><td><span class="chip ' + (u.aktif ? 'c-ok' : 'c-bad') + '">' + (u.aktif ? 'Aktif' : 'Nonaktif') + '</span></td><td style="white-space:nowrap"><button class="btn btn-o btn-s" data-act="toggleUser" data-id="' + esc(u.id) + '">' + (u.aktif ? 'Nonaktifkan' : 'Aktifkan') + '</button> <button class="btn btn-o btn-s" data-act="resetUser" data-id="' + esc(u.id) + '">Reset sandi</button></td></tr>'; }).join('') + '</tbody></table></div>';
+    $('uCfg').innerHTML = googleCard();
+    $('uBody').innerHTML = '<div class="tbl-wrap"><table><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Lembaga</th><th>Jenis mitra</th><th>Status</th><th></th></tr></thead><tbody>' + S.users.map(function (u) {
+      const id = esc(u.id), me = S.me && u.id === S.me.id;
+      return '<tr style="cursor:default"><td class="t-b">' + esc(u.nama) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.peran_nama) + '</td><td>' + esc(u.lembaga) + '</td><td>' + (u.peran === 'mitra' ? (u.jenis_mitra ? esc(jenisNama(u.jenis_mitra)) : '<span class="hint">Belum diatur</span>') : '-') + '</td><td><span class="chip ' + (u.aktif ? 'c-ok' : 'c-bad') + '">' + (u.aktif ? 'Aktif' : 'Nonaktif') + '</span></td><td style="white-space:nowrap"><button class="btn btn-o btn-s" data-act="editUser" data-id="' + id + '">Ubah</button> ' +
+        (me ? '' : '<button class="btn btn-o btn-s" data-act="toggleUser" data-id="' + id + '">' + (u.aktif ? 'Nonaktifkan' : 'Aktifkan') + '</button> ') +
+        (googleOnlyUI() ? '' : '<button class="btn btn-o btn-s" data-act="resetUser" data-id="' + id + '">Reset sandi</button> ') +
+        (u.peran === 'mitra' && !me ? '<button class="btn btn-o btn-s" style="color:var(--bad,#b3261e)" data-act="delUser" data-id="' + id + '">' + mi('delete') + ' Hapus</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
   };
   if (S.users) draw(); api('daftar_user').then(function (u) { S.users = u; if (S.view === 'users') draw(); }).catch(function (e) { toast('bad', e.message); });
+}
+function jenisOpts(sel) { return '<option value="">— Pilih jenis mitra —</option>' + ((S.master && S.master.jenis) || []).map(function (j) { return '<option value="' + esc(j.kode) + '"' + (j.kode === sel ? ' selected' : '') + '>' + esc(j.nama) + '</option>'; }).join(''); }
+function editUser(u) {
+  const mitra = u.peran === 'mitra';
+  modal({ title: 'Ubah pengguna', sub: esc(u.email), body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="euN" value="' + esc(u.nama) + '"></div><div class="fld"><label>Email' + (googleOnlyUI() ? ' Google' : '') + '</label><input class="in" type="email" id="euE" value="' + esc(u.email) + '"></div><div class="row2"><div class="fld"><label>Lembaga</label><input class="in" id="euL" value="' + esc(u.lembaga) + '"></div><div class="fld"><label>Jabatan</label><input class="in" id="euJ" value="' + esc(u.jabatan) + '"></div></div><div class="row2"><div class="fld"><label>Telepon / WhatsApp</label><input class="in" id="euT" value="' + esc(u.telepon) + '"></div>' + (mitra ? '<div class="fld"><label>Jenis mitra</label><select class="in" id="euM">' + jenisOpts(u.jenis_mitra) + '</select></div>' : '') + '</div>' + (mitra ? '<p class="hint">Jenis mitra menentukan daftar dokumen persyaratan. Pengajuan yang masih tahap 1 ikut diperbarui.</p>' : ''), ok: 'Simpan', onOk: function () {
+    const d = { id: u.id, nama: $('euN').value, email: $('euE').value, lembaga: $('euL').value, jabatan: $('euJ').value, telepon: $('euT').value }; if (mitra) d.jenis_mitra = $('euM').value;
+    return api('ubah_user', d).then(function (r) { Object.assign(u, r.user); if (S.view === 'users') vUsers(); toast('ok', 'Data pengguna disimpan.'); });
+  } });
+}
+function delUser(u) {
+  api('hapus_user_info', { id: u.id }).then(function (i) {
+    modal({ title: 'Hapus akun mitra?', danger: true, ok: 'Hapus permanen', body: '<p>Akun <b>' + esc(i.email) + '</b> (' + esc(i.nama) + (i.lembaga ? ', ' + esc(i.lembaga) : '') + ') akan dihapus <b>beserta seluruh datanya</b>:</p><ul style="margin:8px 0 8px 18px"><li>' + i.pengajuan + ' pengajuan beserta riwayat, telaah, area peta, dan monev</li><li>' + i.berkas + ' berkas unggahan (dipindah ke Sampah Drive, dapat dipulihkan 30 hari)</li>' + ((i.ba_resmi || i.pks_resmi) ? '<li><b>' + i.ba_resmi + ' Berita Acara disahkan &amp; ' + i.pks_resmi + ' PKS ditandatangani</b> — kodenya tidak dapat diverifikasi lagi</li>' : '') + '</ul><p><b>Tindakan ini tidak dapat dibatalkan.</b> Bila hanya ingin menutup akses, gunakan <i>Nonaktifkan</i>.</p><div class="fld" style="margin-top:10px"><label>Ketik email akun untuk konfirmasi</label><input class="in" id="duK" autocomplete="off" placeholder="' + esc(i.email) + '"></div>', onOk: function () {
+      const k = $('duK').value.trim(); if (k.toLowerCase() !== String(u.email).toLowerCase()) return Promise.reject(new Error('Ketik email akun persis seperti yang tertera.'));
+      return api('hapus_user', { id: u.id, konfirmasi: k }).then(function () { S.users = (S.users || []).filter(function (x) { return x.id !== u.id; }); S.list = null; if (S.view === 'users') vUsers(); toast('ok', 'Akun mitra dan seluruh datanya dihapus.'); });
+    } });
+  }).catch(function (e) { toast('bad', e.message); });
+}
+function gAtur() {
+  api('google_status').then(function (g) {
+    const org = location.origin;
+    modal({ title: 'Login dengan Google', sub: 'Aktifkan masuk memakai akun Google', body:
+      '<ol class="steps" style="margin:0 0 12px 18px;line-height:1.6"><li>Buka <b>console.cloud.google.com</b> &rarr; <i>APIs &amp; Services</i> &rarr; <i>OAuth consent screen</i> (jenis External, isi nama aplikasi &amp; email).</li><li><i>Credentials</i> &rarr; <i>Create credentials</i> &rarr; <i>OAuth client ID</i> &rarr; jenis <b>Web application</b>.</li><li>Pada <i>Authorized JavaScript origins</i> isi: <b style="user-select:all">' + esc(org) + '</b></li><li>Salin <b>Client ID</b> ke kolom di bawah, isi email Google Anda sebagai Admin, lalu simpan.</li></ol>' +
+      '<div class="fld"><label>Client ID</label><input class="in" id="gaC" value="' + esc(g.client_id) + '" placeholder="1234567890-abc.apps.googleusercontent.com"></div><div class="fld"><label>Email Google Admin (yang Anda pakai untuk masuk)</label><input class="in" type="email" id="gaE" value="' + esc(/\.local$/.test(g.email_admin) ? '' : g.email_admin) + '"></div>' +
+      '<div class="fld"><label>Mode</label><select class="in" id="gaM"><option value="0"' + (g.hanya_google ? '' : ' selected') + '>Peralihan — Google dan kata sandi sama-sama boleh</option><option value="1"' + (g.hanya_google ? ' selected' : '') + '>Hanya Google (kata sandi dimatikan)</option></select></div>' +
+      '<p class="hint">Disarankan: simpan dengan mode Peralihan, <b>keluar</b>, masuk sebagai Admin lewat tombol Google, lalu kembali ke sini untuk memilih &ldquo;Hanya Google&rdquo;. Ini mencegah Anda terkunci. Kosongkan Client ID untuk mematikan login Google. Semua staf dan mitra perlu memakai email Google.</p>', ok: 'Simpan', onOk: function () {
+      return api('google_atur', { client_id: $('gaC').value, email_admin: $('gaE').value, hanya_google: $('gaM').value === '1' }).then(function (r) {
+        S.master.config = Object.assign({}, S.master.config, { google_client_id: r.client_id, password_login: r.password_login }); persist(); S.users = null;
+        if (r.email_admin && S.me) { S.me.email = r.email_admin; renderNav(); }
+        if (S.view === 'users') vUsers(); toast('ok', r.aktif ? 'Login Google disimpan.' : 'Login Google dimatikan.');
+      });
+    } });
+  }).catch(function (e) { toast('bad', e.message); });
 }
 function showPw(title, user, pw) { modal({ title: title, body: '<p>Akun: <b>' + esc(user.email) + '</b></p><p style="margin-top:8px">Kata sandi sementara:</p><div class="card" style="font-family:monospace;font-size:18px;text-align:center;padding:12px;margin-top:6px;user-select:all">' + esc(pw) + '</div><p class="hint" style="margin-top:8px">Catat sekarang; kata sandi tidak ditampilkan lagi.</p>', hideCancel: true }); }
 function addUser() {
@@ -139,8 +182,10 @@ function saveMaster(btn) {
 
 /* ----------------------------- Akun ----------------------------- */
 function vAkun() {
-  setTitle('Pengaturan Akun'); const m = S.me;
-  setView('<div class="ph"><div><h2>Pengaturan akun</h2></div></div><div class="grid g2"><div class="card"><h3>Profil</h3><dl class="kv" style="margin-top:10px"><dt>Nama</dt><dd>' + esc(m.nama) + '</dd><dt>Email</dt><dd>' + esc(m.email) + '</dd><dt>Peran</dt><dd>' + esc(m.peran_nama) + '</dd><dt>Lembaga</dt><dd>' + esc(m.lembaga || '-') + '</dd></dl></div>' +
+  setTitle('Pengaturan Akun'); const m = S.me, mitra = m.peran === 'mitra';
+  setView('<div class="ph"><div><h2>Pengaturan akun</h2></div></div><div class="grid g2"><div class="card"><h3>Profil</h3><div class="fld" style="margin-top:10px"><label>Email</label><input class="in" value="' + esc(m.email) + '" disabled></div><div class="fld"><label>Peran</label><input class="in" value="' + esc(m.peran_nama) + '" disabled></div><div class="fld"><label>Nama <i>*</i></label><input class="in" id="pkN" value="' + esc(m.nama) + '"></div>' +
+    (mitra ? '<div class="fld"><label>Lembaga <i>*</i></label><input class="in" id="pkL" value="' + esc(m.lembaga) + '"></div><div class="fld"><label>Jenis mitra <i>*</i></label><select class="in" id="pkM">' + jenisOpts(m.jenis_mitra) + '</select><p class="hint">Menentukan dokumen persyaratan yang harus diunggah. Tidak dapat diubah setelah ada pengajuan yang diproses.</p></div>' : '') +
+    '<div class="row2"><div class="fld"><label>Jabatan</label><input class="in" id="pkJ" value="' + esc(m.jabatan) + '"></div><div class="fld"><label>Telepon / WhatsApp</label><input class="in" id="pkT" value="' + esc(m.telepon) + '"></div></div><button class="btn btn-p" data-act="saveProfil">Simpan profil</button></div>' +
     (googleOnlyUI() ? '<div class="card"><h3>Masuk dengan Google</h3><p class="sub" style="margin-top:8px">Akun ini masuk memakai akun Google <b>' + esc(m.email) + '</b>. Kata sandi dan verifikasi dua langkah dikelola oleh Google, sehingga tidak ada kata sandi aplikasi yang perlu diganti.</p></div>' : '<div class="card"><h3>Ganti kata sandi</h3><div class="fld" style="margin-top:10px"><label>Kata sandi lama</label><input type="password" class="in" id="gpO" autocomplete="current-password"></div><div class="fld"><label>Kata sandi baru (min. 8)</label><input type="password" class="in" id="gpN" autocomplete="new-password"></div><button class="btn btn-p" data-act="changePw">Simpan</button></div>') + '</div>');
 }
 
@@ -185,7 +230,14 @@ const ACT = {
   saveCk: saveChecklist, saveTp: saveTelaahProgram, saveTb: saveTelaahBiaya, saveMv: saveMonev,
   saveBA: function (el) { saveBA(el, el.dataset.j); }, sahBA: function (el) { sahkanBA(el.dataset.id); }, savePks: function (el) { savePKS(el); },
   dl: function (el, e) { e.preventDefault(); downloadFile(el.dataset.id); }, delFile: function (el) { deleteFile(el.dataset.id); },
-  addUser: addUser, saveMaster: saveMaster,
+  addUser: addUser, saveMaster: saveMaster, gAtur: gAtur,
+  editUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; if (u) editUser(u); },
+  delUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; if (u) delUser(u); },
+  saveProfil: function (el) {
+    const d = { nama: $('pkN').value, jabatan: $('pkJ').value, telepon: $('pkT').value }; if ($('pkM')) { d.jenis_mitra = $('pkM').value; d.lembaga = $('pkL').value; }
+    if (!d.nama.trim()) { toast('bad', 'Nama wajib diisi.'); return; } if ($('pkM') && !d.jenis_mitra) { toast('bad', 'Pilih jenis mitra.'); return; }
+    loadingBtn(el, true); api('profil_simpan', d).then(function (u) { Object.assign(S.me, u); S.list = null; persist(); renderNav(); toast('ok', 'Profil disimpan.'); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(el, false); });
+  },
   toggleUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; api('ubah_user', { id: u.id, aktif: !u.aktif }).then(function (r) { u.aktif = r.user.aktif; vUsers(); toast('ok', 'Status akun diperbarui.'); }).catch(function (e) { toast('bad', e.message); }); },
   resetUser: function (el) { if (googleOnlyUI()) { toast('', 'Pengguna masuk dengan Google; tidak ada kata sandi untuk direset.'); return; } const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; modal({ title: 'Reset kata sandi?', sub: esc(u.email), ok: 'Reset', onOk: function () { return api('ubah_user', { id: u.id, reset: true }).then(function (r) { setTimeout(function () { showPw('Kata sandi baru', r.user, r.password); }, 50); }); } }); },
   changePw: function (el) { loadingBtn(el, true); api('ganti_password', { lama: $('gpO').value, baru: $('gpN').value }).then(function () { toast('ok', 'Kata sandi diganti.'); $('gpO').value = ''; $('gpN').value = ''; }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(el, false); }); }
