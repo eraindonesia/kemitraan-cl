@@ -5,7 +5,56 @@ function showAuth() {
   const sel = $('rgJenis'); const list = S.master ? S.master.jenis.map(function (j) { return [j.kode, j.nama]; }) : JENIS_FALLBACK;
   sel.innerHTML = '<option value="">Pilih jenis mitra…</option>' + list.map(function (j) { return '<option value="' + esc(j[0]) + '">' + esc(j[1]) + '</option>'; }).join('');
   const c = S.master && S.master.config; if (c && (c.helpdesk_email || c.helpdesk_telp)) $('helpdesk').innerHTML = 'Bantuan: ' + esc(c.helpdesk_email || '') + ' ' + esc(c.helpdesk_telp || '');
+  applyAuthMode();
 }
+/* ----------------------------- Login Google (Google Identity Services) ----------------------------- */
+function authCfg() { const c = (S.master && S.master.config) || {}; return { gid: c.google_client_id || '', pw: c.password_login !== false }; }
+function googleOnlyUI() { const a = authCfg(); return !!a.gid && !a.pw; }
+function applyAuthMode() {
+  const a = authCfg(); const g = !!a.gid; const seg = document.querySelector('.auth-box .seg');
+  $('googleBox').hidden = !g; $('formProfil').hidden = true; $('gErr').textContent = '';
+  if (!g) { seg.hidden = false; return; }
+  seg.hidden = true; $('formReg').hidden = true; $('formLogin').hidden = !a.pw; $('gOr').hidden = !a.pw;
+  const sel = $('pfJenis'); const list = S.master ? S.master.jenis.map(function (j) { return [j.kode, j.nama]; }) : JENIS_FALLBACK;
+  sel.innerHTML = '<option value="">Pilih jenis mitra…</option>' + list.map(function (j) { return '<option value="' + esc(j[0]) + '">' + esc(j[1]) + '</option>'; }).join('');
+  gButton($('gBtn'), onGoogleLogin, { text: 'signin_with', width: 340 });
+}
+function loadGIS(cb) {
+  if (window.google && google.accounts && google.accounts.id) return cb();
+  S._gisQ = S._gisQ || []; S._gisQ.push(cb); if (S._gisLoading) return; S._gisLoading = true;
+  const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.defer = true;
+  sc.onload = function () { S._gisLoading = false; S._gisQ.splice(0).forEach(function (f) { f(); }); };
+  sc.onerror = function () { S._gisLoading = false; S._gisQ = []; const e = $('gErr'); if (e) e.textContent = 'Layanan Google tidak dapat dimuat. Periksa koneksi internet Anda lalu muat ulang halaman.'; const b = $('gBtn'); if (b) b.innerHTML = '<button class="btn btn-o" type="button" data-act="gRetry">Coba lagi</button>'; };
+  document.head.appendChild(sc);
+}
+function gButton(el, cb, opt) {
+  if (!el) return;
+  loadGIS(function () {
+    const gid = authCfg().gid; if (!gid) return;
+    if (S._gInit !== gid) { google.accounts.id.initialize({ client_id: gid, callback: function (r) { if (S._gcb && r && r.credential) S._gcb(r.credential); }, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true }); S._gInit = gid; }
+    S._gcb = cb; el.innerHTML = '';
+    google.accounts.id.renderButton(el, Object.assign({ theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'id', logo_alignment: 'left', width: 340 }, opt || {}));
+  });
+}
+function onGoogleLogin(cred) {
+  $('gErr').textContent = ''; const b = $('gBtn'); b.style.opacity = '.5'; b.style.pointerEvents = 'none';
+  api('login_google', { credential: cred }).then(function (r) { if (r.perlu_daftar) showProfil(r, cred); else afterAuth(r); })
+    .catch(function (er) { $('gErr').textContent = er.message; }).then(function () { b.style.opacity = ''; b.style.pointerEvents = ''; });
+}
+function showProfil(r, cred) {
+  S._gcredReg = cred; $('googleBox').hidden = true; $('formLogin').hidden = true; $('formProfil').hidden = false; $('pfErr').textContent = '';
+  $('pfEmail').value = r.email; $('pfNama').value = r.nama || ''; $('pfLembaga').focus();
+}
+/** Konfirmasi pejabat: kata sandi (mode lama) atau verifikasi ulang dengan akun Google (mode Google). */
+function approverField(id, hint) {
+  if (googleOnlyUI()) return '<div class="fld"><label>Verifikasi dengan akun Google <i>*</i></label><div id="' + id + 'G" class="gbtn"></div><input type="hidden" id="' + id + '"><div class="hint" id="' + id + 'S">Klik tombol Google dan pilih akun <b>' + esc(S.me.email) + '</b> untuk memverifikasi bahwa Anda penanda tangan.</div></div>';
+  return '<div class="fld"><label>Kata sandi Anda <i>*</i></label><input type="password" class="in" id="' + id + '" autocomplete="current-password">' + (hint ? '<span class="hint">' + hint + '</span>' : '') + '</div>';
+}
+function approverInit(id) {
+  if (!googleOnlyUI()) return;
+  gButton($(id + 'G'), function (cred) { $(id).value = cred; $(id + 'S').innerHTML = '<span style="color:var(--green);font-weight:600">✓ Terverifikasi.</span> Lanjutkan dengan tombol di bawah (berlaku 10 menit).'; }, { text: 'continue_with', width: 300 });
+}
+function approverMsg() { return googleOnlyUI() ? 'Verifikasi dengan akun Google wajib dilakukan.' : 'Kata sandi wajib diisi.'; }
 function showApp() { $('authScreen').hidden = true; $('appShell').hidden = false; applyTheme(); }
 function forceLogout(msg) {
   S.token = null; S.me = null; S.peta = null; S.dok = null; S._sig = null; LS.del('sm_tok'); LS.del('sm_snap'); LS.del('sm_peta'); LS.del('sm_form'); S.det = {}; S.dash = { periode: 'all', kawasan: '' }; S.params = {}; S.stack = []; S.view = '';
@@ -23,6 +72,13 @@ function bindAuth() {
     if (!em || !pw) { $('lgErr').textContent = 'Email dan kata sandi wajib diisi.'; return; }
     const b = $('btnLogin'); loadingBtn(b, true);
     api('login', { email: em, password: pw }).then(afterAuth).catch(function (er) { $('lgErr').textContent = er.message; }).then(function () { loadingBtn(b, false); });
+  });
+  $('formProfil').addEventListener('submit', function (e) {
+    e.preventDefault(); $('pfErr').textContent = '';
+    const d = { credential: S._gcredReg, lembaga: $('pfLembaga').value, jenis_mitra: $('pfJenis').value, nama: $('pfNama').value, jabatan: $('pfJab').value, telepon: $('pfTelp').value };
+    if (!d.lembaga.trim() || !d.nama.trim() || !d.jenis_mitra || !d.telepon.trim()) { $('pfErr').textContent = 'Lengkapi semua kolom bertanda *.'; return; }
+    const b = $('btnProfil'); loadingBtn(b, true);
+    api('register_google', d).then(afterAuth).catch(function (er) { $('pfErr').textContent = er.message; }).then(function () { loadingBtn(b, false); });
   });
   $('formReg').addEventListener('submit', function (e) {
     e.preventDefault(); $('rgErr').textContent = '';

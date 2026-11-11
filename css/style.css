@@ -468,3 +468,28 @@ body{background:var(--bg);-webkit-font-smoothing:antialiased}
 
 .auth-l h1{text-transform:uppercase;font-size:34px;line-height:1.18;letter-spacing:-.3px}
 @media (max-width:1180px){.auth-l h1{font-size:28px}}
+
+/* ---- Dokumen persyaratan per poin ---- */
+.dok-top{display:flex;gap:18px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}
+.dok-prog{min-width:190px}.dok-prog b{font-size:22px}.dok-prog small{color:var(--tx-3);margin-left:6px}
+.dok-prog .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}.dok-prog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),#35d19a);border-radius:99px;transition:width .3s}
+.dok-body{display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:16px;margin-top:8px}
+.dok-menu{display:flex;flex-direction:column;gap:6px}
+.dok-it{display:flex;gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);transition:background .12s,border-color .12s}
+.dok-it:hover{background:var(--bg)}.dok-it.on{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 8%,var(--card));box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 14%,transparent)}
+.dok-it .no{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--bg);color:var(--tx-2)}
+.dok-it.done .no{background:var(--green);color:#fff}.dok-it.on:not(.done) .no{background:var(--teal);color:#fff}
+.dok-it .tx{font-size:13px;font-weight:600;line-height:1.35;min-width:0}.dok-it .tx small{display:block;font-weight:500;color:var(--tx-3);font-size:11.5px;margin-top:2px}
+.dok-pane{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--card);display:flex;flex-direction:column;gap:14px}
+.dok-ph{display:flex;gap:12px;justify-content:space-between;align-items:flex-start}.dok-ph h4{font-size:16px;line-height:1.35;margin-top:2px}
+.eyebrow-s{font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--teal-d);font-weight:700}
+.dropz{display:flex;flex-direction:column;align-items:center;gap:4px;padding:26px 16px;border:2px dashed var(--line-2);border-radius:14px;cursor:pointer;text-align:center;transition:background .12s,border-color .12s}
+.dropz:hover,.dropz:focus-visible{background:color-mix(in srgb,var(--teal) 6%,transparent);border-color:var(--teal);outline:none}
+.dropz .mi{font-size:34px;color:var(--teal)}.dropz b{font-size:13.5px}.dropz small{color:var(--tx-3)}
+.dok-files{display:flex;flex-direction:column;gap:8px}.dok-nav{display:flex;justify-content:space-between;margin-top:auto}
+@media (max-width:900px){.dok-body{grid-template-columns:1fr}.dok-menu{flex-direction:row;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}.dok-it{min-width:220px;scroll-snap-align:start}}
+
+/* ---- Login Google ---- */
+.gbtn{display:flex;justify-content:center;min-height:44px;margin:18px 0 4px}
+.gnote{margin-top:14px;text-align:center;line-height:1.55}
+.gor{display:flex;align-items:center;gap:10px;color:var(--tx-3);font-size:12px;margin:16px 0 4px}.gor::before,.gor::after{content:"";flex:1;height:1px;background:var(--line)}

@@ -285,6 +285,7 @@ function hapusBatas(kaw) { modal({ title: 'Hapus batas kawasan?', sub: esc(kaw),
 
 /* ----------------------------- Pendaftaran aksi & perubahan ----------------------------- */
 Object.assign(ACT, {
+  dokItem: function (el) { if (el.disabled) return; S.dokSel = { id: S.params.id, i: Number(el.dataset.i) || 0 }; renderDetailBody(); },
   toggleProf: function () { const p = $('profPop'); p.hidden = !p.hidden; closePop('profPop'); },
   profGo: function (el) { closePop(); navigateTo(el.dataset.v, {}); },
   goPeta: function () { navigateTo('peta', {}); }, cekLokasi: function () { navigateTo('peta', { cek: 1 }); }, bantuan: openBantuan,

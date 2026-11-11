@@ -118,13 +118,32 @@ function tRingkasan(p, d) {
     '<div class="card"><h3>Status</h3><p class="sub">Posisi saat ini</p><dl class="kv" style="grid-template-columns:100px 1fr"><dt>Tahap</dt><dd>' + p.tahap + '/12 — ' + esc(stageName(p.tahap)) + '</dd><dt>Status</dt><dd>' + chip(p) + '</dd><dt>Dibuat</dt><dd>' + fmtD(p.dibuat) + '</dd><dt>Diperbarui</dt><dd>' + fmtDT(p.diubah) + '<br><span class="t-sub">oleh ' + esc(p.diubah_oleh) + '</span></dd><dt>Pelaku tahap</dt><dd>' + esc((S.master.stages[p.tahap - 1] || {}).pelaku || '') + '</dd></dl></div></div>';
 }
 function fileChip(b, del) { return '<span class="file">' + mi('description', 'font-size:15px') + '<a href="#" data-act="dl" data-id="' + esc(b.id) + '">' + esc(b.nama) + '</a><span class="t-sub">' + Math.round((b.ukuran || 0) / 1024) + ' KB</span>' + (del ? '<button data-act="delFile" data-id="' + esc(b.id) + '" aria-label="Hapus berkas">' + mi('close', 'font-size:15px') + '</button>' : '') + '</span>'; }
+function dokItems(p) {
+  const per = S.master.persyaratan || {}; let it = per[p.jenis_mitra] || []; let fb = false;
+  if (!it.length) { fb = true; const ls = Object.keys(per).map(function (k) { return per[k]; }); it = ls.length ? ls[0].filter(function (x) { return ls.every(function (l) { return l.indexOf(x) > -1; }); }) : []; }
+  return { items: it, fb: fb };
+}
+function dokMissing(p, d) { const di = dokItems(p); return di.items.filter(function (it) { return !d.berkas.some(function (b) { return b.item === it; }); }); }
 function tDokumen(p, d) {
-  const req = (S.master.persyaratan[p.jenis_mitra] || []).concat(['Lainnya']); const up = canUploadDoc(p);
-  return '<div class="card"><h3>Dokumen persyaratan</h3><p class="sub">PDF, JPG, PNG, DOCX, XLSX · maks. 8 MB per berkas.</p>' + req.map(function (it, i) {
-    const fs = d.berkas.filter(function (b) { return b.item === it; });
-    return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(it) + ' ' + (fs.length ? '<span class="chip c-ok">' + mi('check', 'font-size:14px') + ' ' + fs.length + ' berkas</span>' : (it === 'Lainnya' ? '' : '<span class="chip c-draft">Belum ada</span>')) + '</div><div class="fl">' + fs.map(function (b) { return fileChip(b, up); }).join('') + '</div></div>' +
-      (up ? '<div><input type="file" id="fu' + i + '" data-item="' + esc(it) + '" data-chg="upload" hidden accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"><label for="fu' + i + '" class="btn btn-o btn-s" tabindex="0">' + mi('upload') + ' Unggah</label></div>' : '') + '</div>';
-  }).join('') + '</div>';
+  const di = dokItems(p); const req = di.items.concat(['Lainnya']); const up = canUploadDoc(p); const n = di.items.length;
+  const filled = di.items.filter(function (it) { return d.berkas.some(function (b) { return b.item === it; }); }).length;
+  if (!S.dokSel || S.dokSel.id !== p.id) { const first = di.items.findIndex(function (it) { return !d.berkas.some(function (b) { return b.item === it; }); }); S.dokSel = { id: p.id, i: first > -1 ? first : 0 }; }
+  const si = Math.min(S.dokSel.i, req.length - 1); const cur = req[si]; const isLain = cur === 'Lainnya';
+  const pct = n ? Math.round(filled * 100 / n) : 0;
+  const menu = req.map(function (it, i) {
+    const c = d.berkas.filter(function (b) { return b.item === it; }).length; const lain = it === 'Lainnya';
+    return '<button type="button" class="dok-it' + (i === si ? ' on' : '') + (c ? ' done' : '') + '" data-act="dokItem" data-i="' + i + '" aria-current="' + (i === si) + '"><span class="no">' + (c ? mi('check', 'font-size:16px') : (lain ? mi('attach_file', 'font-size:16px') : (i + 1))) + '</span><span class="tx">' + (lain ? 'Dokumen pendukung lainnya' : esc(it)) + (lain ? '<small>Opsional</small>' : '<small>' + (c ? c + ' berkas terunggah' : 'Belum diunggah') + '</small>') + '</span></button>';
+  }).join('');
+  const fs = d.berkas.filter(function (b) { return b.item === cur; });
+  const pane = '<div class="dok-pane"><div class="dok-ph"><div><span class="eyebrow-s">' + (isLain ? 'Opsional' : 'Persyaratan ' + (si + 1) + ' dari ' + n) + '</span><h4>' + (isLain ? 'Dokumen pendukung lainnya' : esc(cur)) + '</h4></div>' +
+    (isLain ? '' : (fs.length ? '<span class="chip c-ok">' + mi('check', 'font-size:14px') + ' Terunggah</span>' : '<span class="chip c-draft">Belum diunggah</span>')) + '</div>' +
+    (up ? '<label class="dropz" for="fuCur" tabindex="0">' + mi('cloud_upload') + '<b>Pilih berkas untuk persyaratan ini</b><small>PDF, JPG, PNG, DOCX, XLSX · maks. 8 MB</small></label><input type="file" id="fuCur" data-item="' + esc(cur) + '" data-chg="upload" hidden accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx">' : '') +
+    '<div class="dok-files">' + (fs.length ? fs.map(function (b) { return fileChip(b, up); }).join('') : '<p class="hint">Belum ada berkas pada poin ini.</p>') + '</div>' +
+    '<div class="dok-nav"><button type="button" class="btn btn-o btn-s" data-act="dokItem" data-i="' + Math.max(0, si - 1) + '"' + (si === 0 ? ' disabled' : '') + '>' + mi('chevron_left') + ' Sebelumnya</button><button type="button" class="btn btn-o btn-s" data-act="dokItem" data-i="' + Math.min(req.length - 1, si + 1) + '"' + (si === req.length - 1 ? ' disabled' : '') + '>Berikutnya ' + mi('chevron_right') + '</button></div></div>';
+  return '<div class="card dok"><div class="dok-top"><div><h3>Dokumen persyaratan</h3><p class="sub">Daftar persyaratan mengikuti Data Master untuk jenis mitra: <b>' + esc((((S.master.jenis || []).filter(function (j) { return j.kode === p.jenis_mitra; })[0]) || {}).nama || 'belum ditentukan') + '</b>.</p></div>' +
+    '<div class="dok-prog"><b>' + filled + ' / ' + n + '</b><small>persyaratan terunggah</small><div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
+    (di.fb ? '<div class="callout warn">' + mi('warning') + '<span>Jenis mitra pengajuan ini belum terisi, sehingga yang ditampilkan hanya persyaratan umum.</span></div>' : '') +
+    '<div class="dok-body"><nav class="dok-menu" aria-label="Daftar persyaratan">' + menu + '</nav>' + pane + '</div></div>';
 }
 function tChecklist(p, d) {
   const items = S.master.persyaratan[p.jenis_mitra] || []; const edit = (S.me.peran === 'prl' || S.me.peran === 'admin') && p.tahap === 3 && FINAL.indexOf(p.status) === -1;

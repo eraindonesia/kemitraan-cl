@@ -2,7 +2,7 @@
 function curP() { return pById(S.params.id); }
 function precheckMaju(p, t) {
   const d = detData(); if (!d) return '';
-  if (t.k.indexOf('Kirim') === 0 && d.berkas.length === 0) { S.tab = 'dokumen'; return 'Unggah minimal satu dokumen persyaratan sebelum mengirim pengajuan.'; }
+  if (t.k.indexOf('Kirim') === 0) { const ms = dokMissing(p, d); if (ms.length) { S.tab = 'dokumen'; S.dokSel = { id: p.id, i: Math.max(0, dokItems(p).items.indexOf(ms[0])) }; return 'Dokumen persyaratan belum lengkap (' + ms.length + ' belum diunggah): ' + ms.slice(0, 2).join('; ') + (ms.length > 2 ? ', dst.' : '') + '.'; } }
   if (t.k === 'Lengkap') { const items = S.master.persyaratan[p.jenis_mitra] || []; const ok = items.every(function (i) { return d.checklist.some(function (c) { return c.item === i && c.status === 'Sesuai'; }); }); if (!ok) { S.tab = 'checklist'; return 'Checklist (Lampiran III) belum seluruhnya "Sesuai". Simpan checklist lengkap terlebih dahulu.'; } }
   return '';
 }
@@ -23,15 +23,16 @@ function applyMaju(p, t, catatan, pw) {
 function openMaju(p, t) {
   const err = precheckMaju(p, t); if (err) { toast('bad', err); renderDetailBody(); return; }
   const body = '<div class="fld"><label>Catatan' + (t.needCatatan ? ' <i>*</i>' : ' (opsional)') + '</label><textarea class="in" id="mjCat" placeholder="' + (t.needCatatan ? 'Wajib diisi, mis. dokumen yang perlu dilengkapi' : 'Tambahkan catatan keputusan') + '"></textarea></div>' +
-    (t.needPass ? '<div class="fld"><label>Kata sandi Anda <i>*</i></label><input type="password" class="in" id="mjPw" autocomplete="current-password"><span class="hint">Persetujuan pejabat memerlukan verifikasi kata sandi.</span></div>' : '') +
+    (t.needPass ? approverField('mjPw', 'Persetujuan pejabat memerlukan verifikasi kata sandi.') : '') +
     (t.terminal ? '<div class="callout bad">' + mi('warning') + '<span>Keputusan ini mengakhiri proses dan tidak dapat dibatalkan.</span></div>' : '');
   modal({ title: t.k, sub: 'Tahap ' + p.tahap + ' · ' + esc(stageName(p.tahap)) + ' → <b>' + esc(t.status) + '</b>', body: body, ok: 'Konfirmasi', danger: !!t.terminal, onOk: function () {
     const cat = $('mjCat').value.trim(); const pw = t.needPass ? $('mjPw').value : '';
     if (t.needCatatan && !cat) { $('mErr').textContent = 'Catatan wajib diisi.'; return false; }
-    if (t.needPass && !pw) { $('mErr').textContent = 'Kata sandi wajib diisi.'; return false; }
+    if (t.needPass && !pw) { $('mErr').textContent = approverMsg(); return false; }
     if (t.needPass) return applyMaju(p, t, cat, pw);
     closeModal(); applyMaju(p, t, cat);
   } });
+  if (t.needPass) approverInit('mjPw');
 }
 
 /* ----------------------------- Simpan instrumen (optimistic) ----------------------------- */
@@ -68,10 +69,11 @@ function saveBA(btn, j) {
   loadingBtn(btn, true); api('ba_simpan', { id: p.id, jenis: j, tanggal: g('tanggal'), peserta: g('peserta'), kesimpulan: g('kesimpulan') }).then(function () { toast('ok', 'Berita acara disimpan.'); S.dirty = false; reloadDetailSoon(p.id); }).catch(function (e) { toast('bad', e.message); loadingBtn(btn, false); });
 }
 function sahkanBA(id) {
-  modal({ title: 'Sahkan Berita Acara', sub: 'Setelah disahkan, isi dikunci.', body: '<div class="fld"><label>Kata sandi Anda <i>*</i></label><input type="password" class="in" id="shPw"></div>', ok: 'Sahkan', onOk: function () {
-    const pw = $('shPw').value; if (!pw) { $('mErr').textContent = 'Kata sandi wajib diisi.'; return false; }
+  modal({ title: 'Sahkan Berita Acara', sub: 'Setelah disahkan, isi dikunci.', body: approverField('shPw'), ok: 'Sahkan', onOk: function () {
+    const pw = $('shPw').value; if (!pw) { $('mErr').textContent = approverMsg(); return false; }
     return api('ba_sahkan', { id_ba: id, password: pw }).then(function () { toast('ok', 'Berita acara disahkan.'); reloadDetailSoon(S.params.id); });
   } });
+  approverInit('shPw');
 }
 function savePKS(btn) {
   const p = curP(); const v = { id: p.id }; const m = { para_pihak: 'pkPihak', ruang_lingkup: 'pkRuang', masa_berlaku: 'pkMasa', tgl_lapor_gubernur: 'pkLapor', bukti_lapor: 'pkBukti' };
@@ -115,8 +117,8 @@ function vUsers() {
 function showPw(title, user, pw) { modal({ title: title, body: '<p>Akun: <b>' + esc(user.email) + '</b></p><p style="margin-top:8px">Kata sandi sementara:</p><div class="card" style="font-family:monospace;font-size:18px;text-align:center;padding:12px;margin-top:6px;user-select:all">' + esc(pw) + '</div><p class="hint" style="margin-top:8px">Catat sekarang; kata sandi tidak ditampilkan lagi.</p>', hideCancel: true }); }
 function addUser() {
   const roles = [['prl', 'Tim Bidang PRL'], ['uptd', 'UPTD Pengelola Kawasan'], ['kepala_dkp', 'Kepala Dinas'], ['admin', 'Admin Sistem'], ['mitra', 'Mitra']];
-  modal({ title: 'Tambah pengguna', body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="auN"></div><div class="fld"><label>Email <i>*</i></label><input class="in" type="email" id="auE"></div><div class="row2"><div class="fld"><label>Peran <i>*</i></label><select class="in" id="auR">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div><div class="fld"><label>Lembaga</label><input class="in" id="auL"></div></div>', ok: 'Buat akun', onOk: function () {
-    return api('buat_user', { nama: $('auN').value, email: $('auE').value, peran: $('auR').value, lembaga: $('auL').value }).then(function (r) { S.users = null; setTimeout(function () { showPw('Akun dibuat', r.user, r.password); if (S.view === 'users') vUsers(); }, 50); });
+  modal({ title: 'Tambah pengguna', body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="auN"></div><div class="fld"><label>' + (googleOnlyUI() ? 'Email Google' : 'Email') + ' <i>*</i></label><input class="in" type="email" id="auE"></div><div class="row2"><div class="fld"><label>Peran <i>*</i></label><select class="in" id="auR">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div><div class="fld"><label>Lembaga</label><input class="in" id="auL"></div></div>', ok: 'Buat akun', onOk: function () {
+    return api('buat_user', { nama: $('auN').value, email: $('auE').value, peran: $('auR').value, lembaga: $('auL').value }).then(function (r) { S.users = null; setTimeout(function () { if (r.password) showPw('Akun dibuat', r.user, r.password); else modal({ title: 'Akun dibuat', body: '<p>Pengguna <b>' + esc(r.user.email) + '</b> dapat langsung masuk dengan tombol <b>Masuk dengan Google</b> memakai akun Google tersebut. Tidak ada kata sandi yang perlu dibagikan.</p>', ok: 'Mengerti', hideCancel: true, onOk: function () { closeModal(); } }); if (S.view === 'users') vUsers(); }, 50); });
   } });
 }
 
@@ -139,7 +141,7 @@ function saveMaster(btn) {
 function vAkun() {
   setTitle('Pengaturan Akun'); const m = S.me;
   setView('<div class="ph"><div><h2>Pengaturan akun</h2></div></div><div class="grid g2"><div class="card"><h3>Profil</h3><dl class="kv" style="margin-top:10px"><dt>Nama</dt><dd>' + esc(m.nama) + '</dd><dt>Email</dt><dd>' + esc(m.email) + '</dd><dt>Peran</dt><dd>' + esc(m.peran_nama) + '</dd><dt>Lembaga</dt><dd>' + esc(m.lembaga || '-') + '</dd></dl></div>' +
-    '<div class="card"><h3>Ganti kata sandi</h3><div class="fld" style="margin-top:10px"><label>Kata sandi lama</label><input type="password" class="in" id="gpO" autocomplete="current-password"></div><div class="fld"><label>Kata sandi baru (min. 8)</label><input type="password" class="in" id="gpN" autocomplete="new-password"></div><button class="btn btn-p" data-act="changePw">Simpan</button></div></div>');
+    (googleOnlyUI() ? '<div class="card"><h3>Masuk dengan Google</h3><p class="sub" style="margin-top:8px">Akun ini masuk memakai akun Google <b>' + esc(m.email) + '</b>. Kata sandi dan verifikasi dua langkah dikelola oleh Google, sehingga tidak ada kata sandi aplikasi yang perlu diganti.</p></div>' : '<div class="card"><h3>Ganti kata sandi</h3><div class="fld" style="margin-top:10px"><label>Kata sandi lama</label><input type="password" class="in" id="gpO" autocomplete="current-password"></div><div class="fld"><label>Kata sandi baru (min. 8)</label><input type="password" class="in" id="gpN" autocomplete="new-password"></div><button class="btn btn-p" data-act="changePw">Simpan</button></div>') + '</div>');
 }
 
 /* ----------------------------- Notifikasi & verifikasi ----------------------------- */
@@ -155,6 +157,8 @@ function openVerif() {
 /* ----------------------------- Delegasi event ----------------------------- */
 const CHG = {};
 const ACT = {
+  pfBatal: function () { $('formProfil').hidden = true; $('googleBox').hidden = false; S._gcredReg = null; },
+  gRetry: function () { applyAuthMode(); },
   'auth-tab': function (el) { const l = el.dataset.v === 'login'; $('formLogin').hidden = !l; $('formReg').hidden = l; $('tabLogin').classList.toggle('on', l); $('tabReg').classList.toggle('on', !l); },
   togglePw: function (el) { const i = el.parentNode.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; },
   openVerif: openVerif, openNav: openNav, closeNav: closeNav, closeModal: closeModal,
@@ -183,7 +187,7 @@ const ACT = {
   dl: function (el, e) { e.preventDefault(); downloadFile(el.dataset.id); }, delFile: function (el) { deleteFile(el.dataset.id); },
   addUser: addUser, saveMaster: saveMaster,
   toggleUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; api('ubah_user', { id: u.id, aktif: !u.aktif }).then(function (r) { u.aktif = r.user.aktif; vUsers(); toast('ok', 'Status akun diperbarui.'); }).catch(function (e) { toast('bad', e.message); }); },
-  resetUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; modal({ title: 'Reset kata sandi?', sub: esc(u.email), ok: 'Reset', onOk: function () { return api('ubah_user', { id: u.id, reset: true }).then(function (r) { setTimeout(function () { showPw('Kata sandi baru', r.user, r.password); }, 50); }); } }); },
+  resetUser: function (el) { if (googleOnlyUI()) { toast('', 'Pengguna masuk dengan Google; tidak ada kata sandi untuk direset.'); return; } const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; modal({ title: 'Reset kata sandi?', sub: esc(u.email), ok: 'Reset', onOk: function () { return api('ubah_user', { id: u.id, reset: true }).then(function (r) { setTimeout(function () { showPw('Kata sandi baru', r.user, r.password); }, 50); }); } }); },
   changePw: function (el) { loadingBtn(el, true); api('ganti_password', { lama: $('gpO').value, baru: $('gpN').value }).then(function () { toast('ok', 'Kata sandi diganti.'); $('gpO').value = ''; $('gpN').value = ''; }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(el, false); }); }
 };
 function bindEvents() {
