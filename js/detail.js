@@ -90,6 +90,7 @@ function tabsFor(p) {
   const t = [['ringkasan', 'Ringkasan'], ['dokumen', 'Dokumen']];
   if (isStaff() || p.tahap > 3) t.push(['checklist', 'Checklist Administrasi (L-III)']);
   if (isStaff() || p.tahap > 4) t.push(['telaah', 'Telaah (L-IV/V)']);
+  if (p.tahap === 6 || (detData() && detData().jadwal)) t.push(['jadwal', 'Jadwal Pemaparan']);
   t.push(['peta', 'Peta Area']); t.push(['ba', 'BA & PKS']); if (p.tahap === 12 || (detData() && detData().monev.length)) t.push(['monev', 'Monev']); t.push(['riwayat', 'Riwayat']); return t;
 }
 function renderDetailBody() {
@@ -107,13 +108,14 @@ function skel() { return '<div class="card"><div class="sk" style="width:40%;mar
 function tabHtml(p, d) {
   if (S.tab === 'ringkasan') return tRingkasan(p, d);
   if (!d) return skel();
-  return ({ dokumen: tDokumen, checklist: tChecklist, telaah: tTelaah, ba: tBA, monev: tMonev, riwayat: tRiwayat, peta: tPeta }[S.tab] || tRingkasan)(p, d);
+  return ({ dokumen: tDokumen, checklist: tChecklist, telaah: tTelaah, ba: tBA, monev: tMonev, jadwal: tJadwal, riwayat: tRiwayat, peta: tPeta }[S.tab] || tRingkasan)(p, d);
 }
 function tRingkasan(p, d) {
   let warn = '';
   if (p.status === 'Perlu dilengkapi' && d) { const r = d.riwayat.filter(function (x) { return x.keputusan === 'Tidak Lengkap'; })[0]; warn = '<div class="callout warn">' + mi('warning') + '<span><b>Perlu dilengkapi.</b> ' + esc(r ? r.catatan : 'Lengkapi dokumen sesuai catatan verifikator.') + '</span></div>'; }
   else if (p.status === 'Perlu dilengkapi') warn = '<div class="callout warn">' + mi('warning') + '<span><b>Perlu dilengkapi.</b> Lihat catatan pada tab Riwayat.</span></div>';
   if (p.status === 'Tidak dilanjutkan') warn = '<div class="callout bad">' + mi('block') + '<span>Pengajuan tidak dilanjutkan.</span></div>';
+  if (d && d.jadwal && d.jadwal.status !== 'Dibatalkan' && p.tahap <= 6) warn += '<div class="callout ok" data-act="gotoTab" data-tab="jadwal" style="cursor:pointer">' + mi('event') + '<span><b>Pemaparan dijadwalkan:</b> ' + jadwalTeks(d.jadwal) + '</span></div>';
   return warn + '<div class="grid g-main"><div class="card"><h3>Data program</h3><p class="sub">Lampiran II</p><dl class="kv"><dt>Lembaga</dt><dd>' + esc(p.lembaga) + '</dd><dt>Jenis mitra</dt><dd>' + esc(jenisNama(p.jenis_mitra)) + '</dd><dt>Kawasan / zona</dt><dd>' + esc(p.kawasan) + ' / ' + esc(p.zona) + '</dd><dt>Lokasi</dt><dd>' + esc(p.lokasi) + ' ' + (p.luas ? '(' + esc(p.luas) + ')' : '') + '</dd><dt>Jangka waktu</dt><dd>' + esc(p.jangka || '-') + '</dd><dt>Anggaran</dt><dd>' + rp(p.biaya) + ' · ' + esc(p.sumber || '-') + '</dd><dt>Uraian</dt><dd style="white-space:pre-wrap">' + esc(p.uraian) + '</dd></dl></div>' +
     '<div class="card"><h3>Status</h3><p class="sub">Posisi saat ini</p><dl class="kv" style="grid-template-columns:100px 1fr"><dt>Tahap</dt><dd>' + p.tahap + '/12 — ' + esc(stageName(p.tahap)) + '</dd><dt>Status</dt><dd>' + chip(p) + '</dd><dt>Dibuat</dt><dd>' + fmtD(p.dibuat) + '</dd><dt>Diperbarui</dt><dd>' + fmtDT(p.diubah) + '<br><span class="t-sub">oleh ' + esc(p.diubah_oleh) + '</span></dd><dt>Pelaku tahap</dt><dd>' + esc((S.master.stages[p.tahap - 1] || {}).pelaku || '') + '</dd></dl></div></div>';
 }
@@ -188,3 +190,12 @@ function tRiwayat(p, d) {
   return '<div class="card"><h3>Jejak audit</h3><p class="sub">Setiap keputusan dicatat permanen.</p><div class="tl">' + (d.riwayat.map(function (r) { return '<div class="it ' + (/Tidak/.test(r.keputusan) ? 'bad' : '') + '"><b>' + esc(r.keputusan) + '</b> <span class="t-sub">(tahap ' + esc(r.dari) + ' → ' + esc(r.ke) + ')</span><small>' + esc(r.pelaku) + ' · ' + esc(PERAN_L(r.peran)) + ' · ' + fmtDT(r.waktu) + '</small>' + (r.catatan ? '<div class="note">' + esc(r.catatan) + '</div>' : '') + '</div>'; }).join('') || '<div class="empty">Belum ada riwayat.</div>') + '</div></div>';
 }
 function PERAN_L(r) { return { mitra: 'Mitra', prl: 'PRL', uptd: 'UPTD', kepala_dkp: 'Kepala DKP', admin: 'Admin' }[r] || r; }
+
+function jadwalTeks(j) { return esc(fmtD(j.tanggal)) + ', ' + esc(j.jam) + (j.jam_selesai ? '–' + esc(j.jam_selesai) : '') + ' WITA' + (j.tempat ? ' · ' + esc(j.tempat) : ''); }
+function tJadwal(p, d) {
+  const j = d.jadwal; const edit = ['prl', 'uptd', 'admin'].indexOf(S.me.peran) > -1 && p.tahap === 6 && FINAL.indexOf(p.status) === -1;
+  const tag = j ? '<span class="chip ' + (j.status === 'Dibatalkan' ? 'c-bad' : 'c-ok') + '">' + esc(j.status) + '</span>' : '';
+  const view = j ? '<div class="callout ' + (j.status === 'Dibatalkan' ? 'bad' : 'ok') + '" style="margin:10px 0">' + mi('event') + '<span>' + jadwalTeks(j) + '</span></div><dl class="kv"><dt>Tempat</dt><dd>' + esc(j.tempat || '-') + '</dd><dt>Rapat daring</dt><dd>' + (j.tautan ? '<a href="' + esc(j.tautan) + '" target="_blank" rel="noopener noreferrer">' + esc(j.tautan) + '</a>' : '-') + '</dd><dt>Peserta</dt><dd>' + esc(j.peserta || '-') + '</dd><dt>Catatan</dt><dd>' + esc(j.catatan || '-') + '</dd><dt>Ditetapkan</dt><dd>' + esc(j.dibuat_oleh) + ' · ' + fmtDT(j.diubah) + '</dd></dl>' : '<div class="empty" style="padding:18px">' + mi('event_busy') + 'Jadwal pemaparan belum ditentukan.</div>';
+  const form = edit ? '<h4 style="margin:16px 0 8px">' + (j && j.status !== 'Dibatalkan' ? 'Ubah jadwal' : 'Tentukan jadwal') + '</h4><div class="row2"><div class="fld"><label>Tanggal <i>*</i></label><input type="date" class="in" id="jdT" min="' + new Date().toISOString().slice(0, 10) + '" value="' + esc(j && j.status !== 'Dibatalkan' ? String(j.tanggal).substr(0, 10) : '') + '"></div><div class="fld"><label>Jam mulai (WITA) <i>*</i></label><input type="time" class="in" id="jdJ" value="' + esc(j ? j.jam : '') + '"></div></div><div class="row2"><div class="fld"><label>Jam selesai</label><input type="time" class="in" id="jdJ2" value="' + esc(j ? j.jam_selesai : '') + '"></div><div class="fld"><label>Tempat</label><input class="in" id="jdP" placeholder="mis. Ruang rapat DKP" value="' + esc(j ? j.tempat : '') + '"></div></div><div class="fld"><label>Tautan rapat daring (opsional bila tempat diisi)</label><input class="in" id="jdL" placeholder="https://meet.google.com/…" value="' + esc(j ? j.tautan : '') + '"></div><div class="fld"><label>Peserta / undangan</label><input class="in" id="jdS" placeholder="PRL, UPTD, mitra, tim teknis…" value="' + esc(j ? j.peserta : '') + '"></div><div class="fld"><label>Catatan untuk mitra</label><textarea class="in" id="jdC" placeholder="Bahan paparan, durasi, perlengkapan…">' + esc(j ? j.catatan : '') + '</textarea></div><div style="display:flex;gap:8px;justify-content:flex-end">' + (j && j.status !== 'Dibatalkan' ? '<button class="btn btn-o" data-act="batalJadwal">Batalkan jadwal</button>' : '') + '<button class="btn btn-p" data-act="saveJadwal">' + mi('event_available') + ' Simpan jadwal</button></div><p class="hint" style="margin-top:8px">Mitra dan staf terkait mendapat notifikasi. Jadwal wajib ada sebelum pemaparan ditandai selesai.</p>' : '';
+  return '<div class="card"><h3>Jadwal pemaparan program ' + tag + '</h3><p class="sub">Tahap 6 — presentasi program kepada tim PRL dan UPTD</p>' + view + form + '</div>';
+}

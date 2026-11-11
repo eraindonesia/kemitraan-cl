@@ -3,6 +3,7 @@ function curP() { return pById(S.params.id); }
 function precheckMaju(p, t) {
   const d = detData(); if (!d) return '';
   if (t.k.indexOf('Kirim') === 0) { const ms = dokMissing(p, d); if (ms.length) { S.tab = 'dokumen'; S.dokSel = { id: p.id, i: Math.max(0, dokItems(p).items.indexOf(ms[0])) }; return 'Dokumen persyaratan belum lengkap (' + ms.length + ' belum diunggah): ' + ms.slice(0, 2).join('; ') + (ms.length > 2 ? ', dst.' : '') + '.'; } }
+  if (t.k === 'Pemaparan Selesai' && !(d.jadwal && d.jadwal.status !== 'Dibatalkan')) { S.tab = 'jadwal'; return 'Tentukan jadwal pemaparan terlebih dahulu (tab Jadwal Pemaparan).'; }
   if (t.k === 'Lengkap') { const items = S.master.persyaratan[p.jenis_mitra] || []; const ok = items.every(function (i) { return d.checklist.some(function (c) { return c.item === i && c.status === 'Sesuai'; }); }); if (!ok) { S.tab = 'checklist'; return 'Checklist (Lampiran III) belum seluruhnya "Sesuai". Simpan checklist lengkap terlebih dahulu.'; } }
   return '';
 }
@@ -227,6 +228,13 @@ const ACT = {
   wNext: function () { const e = wizValidate(S.wiz.step); $('wErr').textContent = e; if (!e) { S.wiz.step++; renderWiz(); window.scrollTo(0, 0); } },
   wBack: function () { if (S.wiz.step) { S.wiz.step--; renderWiz(); } else { S.wiz = null; goBack('daftar'); } },
   wSave: function () { for (let i = 0; i < 4; i++) { const e = wizValidate(i); if (e) { S.wiz.step = i; renderWiz(); $('wErr').textContent = e; return; } } wizSave(); },
+  gotoTab: function (el) { S.tab = el.dataset.tab; renderDetailBody(); },
+  saveJadwal: function (el) {
+    const p = curP(), d = ensureDet(); if (!d) return; const v = { id: p.id, tanggal: $('jdT').value, jam: $('jdJ').value, jam_selesai: $('jdJ2').value, tempat: $('jdP').value, tautan: $('jdL').value, peserta: $('jdS').value, catatan: $('jdC').value };
+    if (!v.tanggal || !v.jam) { toast('bad', 'Tanggal dan jam mulai wajib diisi.'); return; } if (!v.tempat.trim() && !v.tautan.trim()) { toast('bad', 'Isi tempat atau tautan rapat daring.'); return; }
+    loadingBtn(el, true); api('jadwal_simpan', v).then(function (r) { d.jadwal = r; renderDetailBody(); toast('ok', 'Jadwal pemaparan disimpan. Notifikasi terkirim.'); }).catch(function (e) { toast('bad', e.message); loadingBtn(el, false); });
+  },
+  batalJadwal: function () { const p = curP(), d = ensureDet(); modal({ title: 'Batalkan jadwal pemaparan?', body: '<p>Mitra akan diberi tahu. Pemaparan tidak dapat ditandai selesai sebelum jadwal baru ditetapkan.</p>', ok: 'Batalkan jadwal', danger: true, onOk: function () { return api('jadwal_simpan', { id: p.id, batalkan: true }).then(function (r) { d.jadwal = r; renderDetailBody(); toast('ok', 'Jadwal dibatalkan.'); }); } }); },
   saveCk: saveChecklist, saveTp: saveTelaahProgram, saveTb: saveTelaahBiaya, saveMv: saveMonev,
   saveBA: function (el) { saveBA(el, el.dataset.j); }, sahBA: function (el) { sahkanBA(el.dataset.id); }, savePks: function (el) { savePKS(el); },
   dl: function (el, e) { e.preventDefault(); downloadFile(el.dataset.id); }, delFile: function (el) { deleteFile(el.dataset.id); },
