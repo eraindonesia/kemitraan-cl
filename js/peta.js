@@ -49,24 +49,36 @@ const MapKit = (function () {
     const groups = groupsOf(parse(input) || input).filter(function (x) { return x.polys.length; }); if (!groups.length) throw new Error('Tidak ditemukan poligon (Polygon/MultiPolygon).');
     if (groups.length > 40) throw new Error('Terlalu banyak kategori (' + groups.length + '). Pilih kolom kategori lain atau kosongkan (maks. 40).');
     const bernama = groups.some(function (x) { return x.kat; });
-    const build = function (tol, dec) {
-      const rd = Math.pow(10, dec || 6);
-      const feats = groups.map(function (grp) {
-        const clean = grp.polys.map(function (rings) { return rings.map(function (ring) {
-          let r = ring.map(function (p) { const x = +p[0], y = +p[1]; if (!isFinite(x) || !isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) throw new Error('Koordinat di luar rentang. Pastikan urutan [bujur, lintang].'); return [Math.round(x * rd) / rd, Math.round(y * rd) / rd]; });
-          if (r.length > 1 && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1])) r.push([r[0][0], r[0][1]]);
-          if (tol) { r = dp(r, tol); if (r.length < 4) r = ring.map(function (p) { return [Math.round(+p[0] * rd) / rd, Math.round(+p[1] * rd) / rd]; }); }
-          if (r.length < 4) throw new Error('Setiap poligon minimal 3 titik.'); return r; }); });
-        return { kat: grp.kat, geom: clean.length === 1 ? { type: 'Polygon', coordinates: clean[0] } : { type: 'MultiPolygon', coordinates: clean } };
-      });
+    // 1) validasi + bulatkan 6 desimal + tutup cincin — sekali saja (data bisa jutaan titik)
+    let cur = groups.map(function (grp) { return { kat: grp.kat, polys: grp.polys.map(function (rings) { return rings.map(function (ring) {
+      const r = new Array(ring.length); for (let i = 0; i < ring.length; i++) { const x = +ring[i][0], y = +ring[i][1]; if (!isFinite(x) || !isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) throw new Error('Koordinat di luar rentang. Pastikan urutan [bujur, lintang].'); r[i] = [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]; }
+      if (r.length > 1 && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1])) r.push([r[0][0], r[0][1]]);
+      if (r.length < 4) throw new Error('Setiap poligon minimal 3 titik.'); return r; }); }) }; });
+    const cnt = function (gs) { let n = 0; gs.forEach(function (x) { x.polys.forEach(function (rs) { rs.forEach(function (r) { n += r.length; }); }); }); return n; };
+    const out = function (gs, dec) {
+      const rd = Math.pow(10, dec); const feats = gs.map(function (grp) { const polys = grp.polys.map(function (rings) { return rings.map(function (r) { return dec >= 6 ? r : r.map(function (p) { return [Math.round(p[0] * rd) / rd, Math.round(p[1] * rd) / rd]; }); }); });
+        return { kat: grp.kat, geom: polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys } }; });
       return bernama ? { type: 'FeatureCollection', features: feats.map(function (f) { return { type: 'Feature', properties: { kategori: f.kat || 'Lainnya' }, geometry: f.geom }; }) } : feats[0].geom;
     };
-    const over = function (x) { return countVert(x) > maxVert || JSON.stringify(x).length > maxChars; };
-    let g = build(0, 6), tol = 0.00001, note = '', dec = 6;
-    if (over(g)) { dec = 5; g = build(0, 5); note = 'dibulatkan ke ~1 m'; } // 5 desimal ≈ 1,1 m: hemat ±15% tanpa mengubah bentuk
-    while (over(g) && tol < 0.05) { tol *= 1.8; g = build(tol, dec); note = 'disederhanakan'; }
-    if (over(g)) throw new Error('Poligon terlalu kompleks untuk disimpan (' + countVert(g) + ' titik). Potong atau sederhanakan di aplikasi GIS lalu impor ulang.');
-    return { geom: g, note: note, luas: areaHa(g), vert: countVert(g), kats: bernama ? groups.map(function (x) { return x.kat || 'Lainnya'; }) : [] };
+    // perkiraan murah: ≥14 karakter/titik → stringify mahal hanya bila mendekati batas
+    const over = function (gs, dec) { const v = cnt(gs); if (v > maxVert || v * 14 > maxChars) return true; if (v * 20 < maxChars * 0.9) return false; return JSON.stringify(out(gs, dec)).length > maxChars; };
+    let dec = 6, note = '', tol = 0, hilang = 0;
+    if (over(cur, 6)) { dec = 5; note = 'dibulatkan ke ~1 m'; }
+    if (dec === 5 && over(cur, 5)) {
+      const n0 = cnt(cur); tol = n0 > maxVert * 4 ? 0.00003 : 0.00001; // data sangat padat: mulai dari toleransi lebih besar (≈3 m)
+      while (over(cur, 5) && tol < 0.05) {
+        cur = cur.map(function (grp) { return { kat: grp.kat, polys: grp.polys.map(function (rings) {
+          const o = dp(rings[0], tol); if (o.length < 4) { hilang++; return null; }
+          const holes = []; for (let i = 1; i < rings.length; i++) { const h = dp(rings[i], tol); if (h.length >= 4) holes.push(h); }
+          return [o].concat(holes); }).filter(Boolean) }; }).filter(function (grp) { return grp.polys.length; });
+        if (!cur.length) throw new Error('Semua poligon lebih kecil dari toleransi penyederhanaan. Periksa satuan koordinat.');
+        tol *= 1.5; note = 'disederhanakan';
+      }
+      if (over(cur, 5)) throw new Error('Poligon terlalu kompleks untuk disimpan (' + cnt(cur) + ' titik). Potong atau sederhanakan di aplikasi GIS lalu impor ulang.');
+      if (hilang) note += ' (' + hilang + ' poligon sangat kecil dibuang)';
+    }
+    const g = out(cur, dec);
+    return { geom: g, note: note, luas: areaHa(g), vert: countVert(g), kats: bernama ? cur.map(function (x) { return x.kat || 'Lainnya'; }) : [] };
   }
   /** Shapefile (.zip, atau gabungan .shp/.prj/.dbf) → GeoJSON FeatureCollection. Pustaka shpjs dimuat saat dibutuhkan (self-hosted). */
   let shpLoad = null;
@@ -79,7 +91,7 @@ const MapKit = (function () {
   function readShapefile(files) {
     files = Array.prototype.slice.call(files); const zip = files.filter(function (f) { return ext(f) === 'zip'; })[0]; const shpf = files.filter(function (f) { return ext(f) === 'shp'; })[0]; const prjf = files.filter(function (f) { return ext(f) === 'prj'; })[0];
     if (!zip && !shpf) return Promise.reject(new Error('Pilih berkas .zip Shapefile, atau berkas .shp (sertakan .prj dan .dbf).'));
-    if (files.some(function (f) { return f.size > 25 * 1024 * 1024; })) return Promise.reject(new Error('Berkas terlalu besar (maks. 25 MB). Sederhanakan atau potong di aplikasi GIS.'));
+    if (files.some(function (f) { return f.size > 300 * 1024 * 1024; })) return Promise.reject(new Error('Berkas terlalu besar (maks. 300 MB). Potong per kawasan di aplikasi GIS lalu impor ulang.'));
     return loadShp().then(function (shp) {
       if (zip) return readBuf(zip).then(function (b) { return shp(b); });
       const dbff = files.filter(function (f) { return ext(f) === 'dbf'; })[0];
@@ -315,7 +327,7 @@ const MapKit = (function () {
       q('file').onchange = function () {
         const fs = Array.prototype.slice.call(this.files); if (!fs.length) return; q('err').textContent = ''; q('info').textContent = ''; pend = null; q('katbox').style.display = 'none';
         if (fs.some(function (f) { return ['zip', 'shp'].indexOf(ext(f)) > -1; })) {
-          q('info').textContent = 'Membaca Shapefile…';
+          q('info').textContent = 'Membaca Shapefile (' + (fs.reduce(function (a, f) { return a + f.size; }, 0) / 1048576).toFixed(1) + ' MB)… berkas besar bisa memakan beberapa detik.';
           readShapefile(fs).then(function (g) { setPending({ type: 'FeatureCollection', features: g.features }); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message || 'Shapefile tidak dapat dibaca.'; });
           return;
         }
@@ -326,9 +338,12 @@ const MapKit = (function () {
         fetchArcgis(q('arc').value, 5).then(function (fc) { if (!fc.features.length) throw new Error('Layer tidak berisi fitur.'); setPending(fc); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message; });
       };
       q('ok').onclick = function () {
-        let g; try { g = normalize(pend ? withKat(pend.fc, q('kol').value) : parseText(q('txt').value), maxChars, maxVert); } catch (e) { q('err').textContent = e.message; return; }
+        const btn = q('ok'); const work = function () {
+          let g; try { g = normalize(pend ? withKat(pend.fc, q('kol').value) : parseText(q('txt').value), maxChars, maxVert); } catch (e) { q('err').textContent = e.message; q('info').textContent = ''; btn.disabled = false; return; }
         complex = null; const ps = polysOf(g.geom); if (!g.kats.length && ps.length === 1 && ps[0].length === 1) { pts = ps[0][0].slice(0, -1).map(function (p) { return [p[1], p[0]]; }); } else { pts = []; complex = g.geom; }
         setDrawing(false); render(true); changed(); if (g.note) toast('', 'Poligon ' + g.note + ' agar muat (' + g.vert + ' titik).'); if (g.kats.length) toast('ok', g.kats.length + ' kategori diberi warna berbeda.'); pn.remove();
+        };
+        q('err').textContent = ''; if (pend && pend._n > 200) { btn.disabled = true; q('info').textContent = 'Memproses ' + pend._n + ' poligon…'; setTimeout(work, 40); } else work();
       };
       q('txt').focus();
     }
