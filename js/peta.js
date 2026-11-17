@@ -142,10 +142,12 @@ const MapKit = (function () {
 
 
   /* ------------------------------ kategori area (warna berbeda per kategori) ------------------------------ */
-  const KAT_TETAP = [[/inti|larang|sanctuary/i, '#C62828'], [/rimba|perlindungan bahari|perlindungan/i, '#2E7D32'], [/pemanfaatan|wisata|budidaya/i, '#1E6FD9'], [/tradisional|adat/i, '#EF8A17'], [/khusus|religi|budaya/i, '#7B3FA0'], [/rehabilitasi|pemulihan/i, '#0E9AA7'], [/penyangga|buffer/i, '#8D6E63'], [/lainnya|lain/i, '#78909C']];
+  const KAT_TETAP = [[/penangkapan|tangkap/i, '#F9A825'], [/budidaya/i, '#8E24AA'], [/wisata/i, '#1E88E5'], [/rehabilitasi|pemulihan/i, '#00897B'], [/inti|larang|sanctuary/i, '#C62828'], [/rimba|perlindungan bahari|perlindungan/i, '#2E7D32'], [/pemanfaatan/i, '#1E6FD9'], [/tradisional|adat/i, '#EF8A17'], [/khusus|religi|budaya/i, '#6A1B9A'], [/penyangga|buffer/i, '#8D6E63'], [/lainnya|lain/i, '#78909C']];
   const KAT_PALET = ['#E91E63', '#009688', '#FF9800', '#3F51B5', '#8BC34A', '#795548', '#00ACC1', '#AFB42B', '#D84315', '#5E35B1', '#43A047', '#F4511E'];
+  function kustom() { return (typeof S !== 'undefined' && S.master && S.master.config && S.master.config.warna_kategori) || {}; }
+  function katWarnaDasar(k) { const c = kustom(); const sv = c[String(k).trim().toLowerCase()]; if (sv) { delete c[String(k).trim().toLowerCase()]; const r = katWarna(k); c[String(k).trim().toLowerCase()] = sv; return r; } return katWarna(k); }
   function katWarna(k) {
-    k = String(k || ''); if (!k) return '#0e8f94'; for (let i = 0; i < KAT_TETAP.length; i++) if (KAT_TETAP[i][0].test(k)) return KAT_TETAP[i][1];
+    k = String(k || ''); if (!k) return '#0e8f94'; const cu = kustom(); const ck = cu[k.trim().toLowerCase()]; if (ck && /^#[0-9a-f]{6}$/i.test(ck)) return ck; for (let i = 0; i < KAT_TETAP.length; i++) if (KAT_TETAP[i][0].test(k)) return KAT_TETAP[i][1];
     let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return KAT_PALET[h % KAT_PALET.length];
   }
   /** [{kat, polys}] — kat dari Feature.properties.kategori ('' bila tidak ada). */
@@ -339,5 +341,5 @@ const MapKit = (function () {
     return { map: map, setBatas: function (l) { setBatas(l); fitBatas(); }, geom: current, luas: function () { const g = current(); return g ? areaHa(g) : 0; }, refresh: summary, setKawasan: function (k) { opts.kawasan = k; summary(); }, invalidate: function () { map.invalidateSize(); } };
   }
 
-  return { fetchArcgis: fetchArcgis, katWarna: katWarna, create: create, overview: overview, editor: editor, disposeAll: disposeAll, disposeModal: disposeModal, normalize: normalize, parseText: parseText, areaHa: areaHa, pointIn: pointIn, cek: cek, lokasiInfo: lokasiInfo, parse: parse, boundsOf: boundsOf, latlngs: latlngs, WARNA: WARNA };
+  return { fetchArcgis: fetchArcgis, katWarna: katWarna, katWarnaDasar: katWarnaDasar, katsOf: katsOf, create: create, overview: overview, editor: editor, disposeAll: disposeAll, disposeModal: disposeModal, normalize: normalize, parseText: parseText, areaHa: areaHa, pointIn: pointIn, cek: cek, lokasiInfo: lokasiInfo, parse: parse, boundsOf: boundsOf, latlngs: latlngs, WARNA: WARNA };
 })();

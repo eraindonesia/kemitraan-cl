@@ -172,7 +172,7 @@ function vMaster() {
   setView('<div class="ph"><div><h2>Data master</h2><p>Kawasan, persyaratan per jenis mitra, dan kontak bantuan.</p></div><div class="sp"></div><button class="btn btn-p" data-act="saveMaster">' + mi('save') + ' Simpan semua</button></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Kawasan konservasi</h3><p class="sub">Satu baris per kawasan. Format: <code>Nama | Dasar hukum | Zona1; Zona2</code></p><textarea class="in" id="mKaw" rows="6">' + esc(m.kawasan.map(function (k) { return k.nama + ' | ' + (k.dasar || '') + ' | ' + k.zona.join('; '); }).join('\n')) + '</textarea></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Persyaratan per jenis mitra</h3><p class="sub">Satu persyaratan per baris.</p>' + m.jenis.map(function (j) { return '<div class="fld"><label>' + esc(j.nama) + '</label><textarea class="in" rows="3" data-mj="' + esc(j.kode) + '">' + esc((m.persyaratan[j.kode] || []).join('\n')) + '</textarea></div>'; }).join('') + '</div>' +
-    batasCardHtml() + arcCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div></div>');
+    batasCardHtml() + warnaCardHtml() + arcCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div></div>');
   fillBatas();
 }
 function saveMaster(btn) {
@@ -202,6 +202,7 @@ function openVerif() {
 
 /* ----------------------------- Delegasi event ----------------------------- */
 const CHG = {};
+CHG.warna = function (t) { const c = S.master.config = S.master.config || {}; c.warna_kategori = Object.assign({}, c.warna_kategori); c.warna_kategori[t.dataset.kat.trim().toLowerCase()] = t.value; simpanWarna(); fillWarna(); };
 const ACT = {
   pfBatal: function () { $('formProfil').hidden = true; $('googleBox').hidden = false; S._gcredReg = null; },
   gRetry: function () { applyAuthMode(); },

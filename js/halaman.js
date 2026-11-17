@@ -264,6 +264,21 @@ function hapusArea(p, id) {
 }
 
 /* ----------------------------- Batas kawasan (Data Master) ----------------------------- */
+function warnaCardHtml() {
+  return '<div class="card" style="margin-bottom:16px"><h3>Warna kategori area</h3><p class="sub">Atur sendiri warna tiap kategori (mis. zona dari Shapefile). Berlaku di semua peta dan legenda; tersimpan otomatis. Kategori muncul di sini setelah ada batas/area berkategori.</p><div id="warnaList">' + skel() + '</div></div>';
+}
+function katTerpakai() {
+  const u = []; const add = function (k) { if (k && u.indexOf(k) < 0) u.push(k); };
+  ((S.peta && S.peta.batas) || []).forEach(function (b) { try { MapKit.katsOf(typeof b.geojson === 'string' ? JSON.parse(b.geojson) : b.geojson).forEach(add); } catch (e) {} });
+  ((S.peta && S.peta.areas) || []).forEach(function (a) { try { MapKit.katsOf(typeof a.geojson === 'string' ? JSON.parse(a.geojson) : a.geojson).forEach(add); } catch (e) {} });
+  return u.sort();
+}
+let warnaTimer = null;
+function simpanWarna() { clearTimeout(warnaTimer); warnaTimer = setTimeout(function () { api('master_simpan', { config: { warna_kategori: (S.master.config || {}).warna_kategori || {} } }).then(function () { persist(); toast('ok', 'Warna kategori disimpan.'); }).catch(function (e) { toast('bad', e.message); }); }, 700); }
+function fillWarna() {
+  const el = $('warnaList'); if (!el) return; const ks = katTerpakai(); const cu = (S.master.config && S.master.config.warna_kategori) || {};
+  el.innerHTML = ks.length ? ks.map(function (k) { const custom = !!cu[k.trim().toLowerCase()]; return '<div class="ck" style="grid-template-columns:auto 1fr auto;align-items:center"><input type="color" class="clr" data-chg="warna" data-kat="' + esc(k) + '" value="' + esc(MapKit.katWarna(k)) + '" aria-label="Warna ' + esc(k) + '"><div><div class="nm">' + esc(k) + '</div><div class="t-sub">' + (custom ? 'Warna kustom' : 'Warna otomatis') + '</div></div>' + (custom ? '<button type="button" class="btn btn-o btn-s" data-act="warnaReset" data-kat="' + esc(k) + '">Kembalikan</button>' : '<span></span>') + '</div>'; }).join('') : '<div class="empty" style="padding:14px">' + mi('palette') + 'Belum ada area berkategori. Impor Shapefile dengan kolom kategori terlebih dahulu.</div>';
+}
 function arcRow(l) { return '<input class="in" data-an placeholder="Nama layer" value="' + esc(l.nama || '') + '"><input class="in" data-au placeholder="https://services.arcgis.com/…/FeatureServer/0" value="' + esc(l.url || '') + '"><input class="in" data-ak placeholder="Kolom kategori (opsional)" value="' + esc(l.kolom || '') + '"><span style="white-space:nowrap"><button type="button" class="btn btn-o btn-s" data-act="arcTest">Uji</button> <button type="button" class="btn btn-o btn-s" data-act="arcDel" aria-label="Hapus layer">' + mi('delete') + '</button></span>'; }
 function arcCardHtml() {
   const L = ((S.master && S.master.config && S.master.config.arcgis_layers) || []);
@@ -275,7 +290,7 @@ function batasCardHtml() {
 function fillBatas() {
   const el = $('batasList'); if (!el) return;
   const draw = function () { if (!$('batasList')) return; $('batasList').innerHTML = S.master.kawasan.map(function (k) { const b = S.peta.batas.filter(function (x) { return x.kawasan === k.nama; })[0]; return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(k.nama) + '</div><div class="t-sub">' + (b ? 'Batas terunggah · ' + numID(b.luas_ha) + ' Ha' : 'Belum ada batas') + '</div></div><div style="display:flex;gap:6px"><button class="btn btn-o btn-s" data-act="batasEdit" data-k="' + esc(k.nama) + '">' + mi('edit_location_alt', 'font-size:16px') + ' ' + (b ? 'Ubah' : 'Atur') + '</button>' + (b ? '<button class="btn btn-o btn-s" data-act="batasDel" data-k="' + esc(k.nama) + '" aria-label="Hapus batas">' + mi('delete', 'font-size:16px') + '</button>' : '') + '</div></div>'; }).join(''); };
-  loadPeta(true).then(draw).catch(function (e) { el.innerHTML = '<div class="callout bad">' + mi('error') + '<span>' + esc(e.message) + '</span></div>'; });
+  loadPeta(true).then(function () { draw(); fillWarna(); }).catch(function (e) { el.innerHTML = '<div class="callout bad">' + mi('error') + '<span>' + esc(e.message) + '</span></div>'; });
 }
 function openBatasModal(kaw) {
   const b = S.peta && S.peta.batas.filter(function (x) { return x.kawasan === kaw; })[0]; let ed = null;
@@ -304,6 +319,7 @@ Object.assign(ACT, {
   areaAdd: function () { openAreaModal(curP(), null); },
   areaEdit: function (el) { const d = detData(); openAreaModal(curP(), d.areas.filter(function (a) { return a.id === el.dataset.id; })[0]); },
   areaDel: function (el) { hapusArea(curP(), el.dataset.id); },
+  warnaReset: function (el) { const c = S.master.config = S.master.config || {}; c.warna_kategori = Object.assign({}, c.warna_kategori); delete c.warna_kategori[el.dataset.kat.trim().toLowerCase()]; simpanWarna(); fillWarna(); },
   arcAdd: function () { const w = $('arcList'); const d = document.createElement('div'); d.className = 'arc-row'; d.innerHTML = arcRow({}); w.appendChild(d); },
   arcDel: function (el) { el.closest('.arc-row').remove(); },
   arcTest: function (el) { const r = el.closest('.arc-row'); const u = r.querySelector('[data-au]').value; el.disabled = true; const old = el.textContent; el.textContent = 'Menguji…';
