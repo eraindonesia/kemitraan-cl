@@ -299,7 +299,7 @@ function openBatasModal(kaw) {
       const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Gambar atau impor batas terlebih dahulu.'; return false; }
       return api('batas_simpan', { kawasan: kaw, geojson: g }).then(function () { toast('ok', 'Batas kawasan tersimpan.'); fillBatas(); });
     } });
-  ed = MapKit.editor($('btMap'), { geom: b ? b.geojson : null, modal: true, maxChars: 45000, satelit: true });
+  ed = MapKit.editor($('btMap'), { geom: b ? b.geojson : null, modal: true, maxChars: 1600000, maxVert: 150000, satelit: true });
 }
 function hapusBatas(kaw) { modal({ title: 'Hapus batas kawasan?', sub: esc(kaw), ok: 'Hapus', danger: true, onOk: function () { return api('batas_simpan', { kawasan: kaw, geojson: '' }).then(function () { toast('ok', 'Batas dihapus.'); fillBatas(); }); } }); }
 

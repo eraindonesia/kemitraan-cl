@@ -27,7 +27,9 @@ const MapKit = (function () {
   function countVert(g) { let n = 0; polysOf(g).forEach(function (rs) { rs.forEach(function (r) { n += r.length; }); }); return n; }
   function countPts(g) { let n = 0; polysOf(g).forEach(function (rs) { rs.forEach(function (r) { n += Math.max(0, r.length - 1); }); }); return n; }
   function inRing(x, y, r) { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { if (((r[i][1] > y) !== (r[j][1] > y)) && (x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0])) c = !c; } return c; }
-  function pointIn(g, lng, lat) { return polysOf(g).some(function (rings) { return inRing(lng, lat, rings[0]) && !rings.slice(1).some(function (h) { return inRing(lng, lat, h); }); }); }
+  const BB = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  function bboxOf(r) { let b = BB && BB.get(r); if (b) return b; b = [Infinity, Infinity, -Infinity, -Infinity]; for (let i = 0; i < r.length; i++) { const p = r[i]; if (p[0] < b[0]) b[0] = p[0]; if (p[1] < b[1]) b[1] = p[1]; if (p[0] > b[2]) b[2] = p[0]; if (p[1] > b[3]) b[3] = p[1]; } if (BB) BB.set(r, b); return b; }
+  function pointIn(g, lng, lat) { return polysOf(g).some(function (rings) { const b = bboxOf(rings[0]); if (lng < b[0] || lng > b[2] || lat < b[1] || lat > b[3]) return false; return inRing(lng, lat, rings[0]) && !rings.slice(1).some(function (h) { return inRing(lng, lat, h); }); }); }
   function parse(s) { if (!s) return null; if (typeof s === 'object') return s; try { return JSON.parse(s); } catch (e) { return null; } }
   function latlngs(g) { // untuk L.polygon
     const conv = function (rings) { return rings.map(function (r) { return r.map(function (p) { return [p[1], p[0]]; }); }); };
@@ -42,24 +44,28 @@ const MapKit = (function () {
     return pts.filter(function (_, i) { return keep[i]; });
   }
   /** Normalisasi → Polygon/MultiPolygon bersih (6 desimal, cincin tertutup); bila ada kategori → FeatureCollection (1 Feature per kategori). Disederhanakan bila melebihi batas. */
-  function normalize(input, maxChars) {
+  function normalize(input, maxChars, maxVert) {
+    maxVert = maxVert || MAX_VERT;
     const groups = groupsOf(parse(input) || input).filter(function (x) { return x.polys.length; }); if (!groups.length) throw new Error('Tidak ditemukan poligon (Polygon/MultiPolygon).');
     if (groups.length > 40) throw new Error('Terlalu banyak kategori (' + groups.length + '). Pilih kolom kategori lain atau kosongkan (maks. 40).');
     const bernama = groups.some(function (x) { return x.kat; });
-    const build = function (tol) {
+    const build = function (tol, dec) {
+      const rd = Math.pow(10, dec || 6);
       const feats = groups.map(function (grp) {
         const clean = grp.polys.map(function (rings) { return rings.map(function (ring) {
-          let r = ring.map(function (p) { const x = +p[0], y = +p[1]; if (!isFinite(x) || !isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) throw new Error('Koordinat di luar rentang. Pastikan urutan [bujur, lintang].'); return [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]; });
+          let r = ring.map(function (p) { const x = +p[0], y = +p[1]; if (!isFinite(x) || !isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) throw new Error('Koordinat di luar rentang. Pastikan urutan [bujur, lintang].'); return [Math.round(x * rd) / rd, Math.round(y * rd) / rd]; });
           if (r.length > 1 && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1])) r.push([r[0][0], r[0][1]]);
-          if (tol) { r = dp(r, tol); if (r.length < 4) r = ring.map(function (p) { return [Math.round(+p[0] * 1e6) / 1e6, Math.round(+p[1] * 1e6) / 1e6]; }); }
+          if (tol) { r = dp(r, tol); if (r.length < 4) r = ring.map(function (p) { return [Math.round(+p[0] * rd) / rd, Math.round(+p[1] * rd) / rd]; }); }
           if (r.length < 4) throw new Error('Setiap poligon minimal 3 titik.'); return r; }); });
         return { kat: grp.kat, geom: clean.length === 1 ? { type: 'Polygon', coordinates: clean[0] } : { type: 'MultiPolygon', coordinates: clean } };
       });
       return bernama ? { type: 'FeatureCollection', features: feats.map(function (f) { return { type: 'Feature', properties: { kategori: f.kat || 'Lainnya' }, geometry: f.geom }; }) } : feats[0].geom;
     };
-    let g = build(0), tol = 0.00001, note = '';
-    while ((countVert(g) > MAX_VERT || JSON.stringify(g).length > maxChars) && tol < 0.05) { tol *= 1.8; g = build(tol); note = 'disederhanakan'; }
-    if (countVert(g) > MAX_VERT || JSON.stringify(g).length > maxChars) throw new Error('Poligon terlalu kompleks untuk disimpan. Potong atau sederhanakan di aplikasi GIS lalu impor ulang.');
+    const over = function (x) { return countVert(x) > maxVert || JSON.stringify(x).length > maxChars; };
+    let g = build(0, 6), tol = 0.00001, note = '', dec = 6;
+    if (over(g)) { dec = 5; g = build(0, 5); note = 'dibulatkan ke ~1 m'; } // 5 desimal ≈ 1,1 m: hemat ±15% tanpa mengubah bentuk
+    while (over(g) && tol < 0.05) { tol *= 1.8; g = build(tol, dec); note = 'disederhanakan'; }
+    if (over(g)) throw new Error('Poligon terlalu kompleks untuk disimpan (' + countVert(g) + ' titik). Potong atau sederhanakan di aplikasi GIS lalu impor ulang.');
     return { geom: g, note: note, luas: areaHa(g), vert: countVert(g), kats: bernama ? groups.map(function (x) { return x.kat || 'Lainnya'; }) : [] };
   }
   /** Shapefile (.zip, atau gabungan .shp/.prj/.dbf) → GeoJSON FeatureCollection. Pustaka shpjs dimuat saat dibutuhkan (self-hosted). */
@@ -160,11 +166,11 @@ const MapKit = (function () {
   }
   function katsOf(g) { return groupsOf(g).filter(function (x) { return x.kat; }).map(function (x) { return x.kat; }); }
   /** Gambar geometri ke peta; bila ada kategori, tiap kategori berwarna sendiri (tooltip: nama + luas). Mengembalikan featureGroup. */
-  function addGeo(g, base, label) {
-    const fg = L.featureGroup(); const gr = groupsOf(g);
+  function addGeo(g, base, label, map) {
+    const fg = L.featureGroup(); const gr = groupsOf(g); const big = map && countVert(g) > 15000; const rend = big ? (map._cv = map._cv || L.canvas({ padding: 0.3 })) : null;
     if (gr.some(function (x) { return x.kat; })) {
       gr.forEach(function (x) { const c = katWarna(x.kat); const geom = x.polys.length === 1 ? { type: 'Polygon', coordinates: x.polys[0] } : { type: 'MultiPolygon', coordinates: x.polys };
-        L.polygon(latlngs(geom), { color: c, weight: 2, fillColor: c, fillOpacity: 0.38 }).bindTooltip((label ? esc(label) + ' · ' : '') + '<b>' + esc(x.kat || 'Lainnya') + '</b> · ' + numHa(areaHa(geom)) + ' Ha', { sticky: true }).addTo(fg); });
+        L.polygon(latlngs(geom), { color: c, weight: big ? 1 : 2, fillColor: c, fillOpacity: 0.38, smoothFactor: big ? 1.5 : 1, renderer: rend || undefined }).bindTooltip((label ? esc(label) + ' · ' : '') + '<b>' + esc(x.kat || 'Lainnya') + '</b> · ' + numHa(areaHa(geom)) + ' Ha', { sticky: true }).addTo(fg); });
     } else L.polygon(latlngs(g), base).addTo(fg);
     return fg;
   }
@@ -223,7 +229,7 @@ const MapKit = (function () {
     const gB = L.featureGroup().addTo(map), gA = L.featureGroup().addTo(map);
     function draw(batas, areas) {
       gB.clearLayers(); gA.clearLayers();
-      let katsA = []; const kts = []; (batas || []).forEach(function (b) { const g = parse(b.geojson); if (!g) return; const ks = katsOf(g); if (ks.length) { ks.forEach(function (k) { kts.push(k); }); addGeo(g, null, b.kawasan).addTo(gB); L.polygon(latlngs(g), { color: '#0a6f73', weight: 2, dashArray: '6 4', fill: false, interactive: false }).addTo(gB); } else L.polygon(latlngs(g), styleBatas()).bindTooltip(esc(b.kawasan) + (b.luas_ha ? ' · ' + Number(b.luas_ha).toLocaleString('id-ID') + ' Ha' : ''), { sticky: true }).addTo(gB); }); setLegend(map, kts, 'Zona / kategori');
+      let katsA = []; const kts = []; (batas || []).forEach(function (b) { const g = parse(b.geojson); if (!g) return; const ks = katsOf(g); if (ks.length) { ks.forEach(function (k) { kts.push(k); }); addGeo(g, null, b.kawasan, map).addTo(gB); L.polygon(latlngs(g), { color: '#0a6f73', weight: 2, dashArray: '6 4', fill: false, interactive: false }).addTo(gB); } else L.polygon(latlngs(g), styleBatas()).bindTooltip(esc(b.kawasan) + (b.luas_ha ? ' · ' + Number(b.luas_ha).toLocaleString('id-ID') + ' Ha' : ''), { sticky: true }).addTo(gB); }); setLegend(map, kts, 'Zona / kategori');
       (areas || []).forEach(function (a) {
         const g = parse(a.geojson); if (!g) return; const c = warnaArea(a);
         const ka = katsOf(g); katsA = katsA.concat(ka); const poly = (ka.length ? addGeo(g, null, a.nama) : L.polygon(latlngs(g), { color: c, weight: 2, fillColor: c, fillOpacity: 0.35 })).addTo(gA);
@@ -241,13 +247,13 @@ const MapKit = (function () {
   /* ------------------------------ editor poligon ------------------------------ */
   /** Widget editor lengkap di dalam host. opts: {geom, kawasan, batas, onChange(geom|null, luas), maxChars, satelit, readonly} */
   function editor(host, opts) {
-    opts = opts || {}; const maxChars = opts.maxChars || 40000;
+    opts = opts || {}; const maxChars = opts.maxChars || 40000, maxVert = opts.maxVert || MAX_VERT;
     host.innerHTML = (opts.readonly ? '' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('edit_location') + ' Isi koordinat / Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>') +
       '<div class="mapbox"></div><div class="mapinfo" aria-live="polite"></div><div class="mapcheck"></div>';
     const box = host.querySelector('.mapbox'), info = host.querySelector('.mapinfo'), chk = host.querySelector('.mapcheck');
     const map = create(box, { satelit: opts.satelit, modal: opts.modal }); if (!map) return null;
     const gBatas = L.featureGroup().addTo(map);
-    function setBatas(list) { gBatas.clearLayers(); opts.batas = list || []; const kts = []; opts.batas.forEach(function (b) { const g = parse(b.geojson); if (!g) return; const ks = katsOf(g); if (ks.length) { ks.forEach(function (k) { kts.push(k); }); addGeo(g, null, b.kawasan).addTo(gBatas); } else L.polygon(latlngs(g), styleBatas()).bindTooltip(esc(b.kawasan), { sticky: true }).addTo(gBatas); }); setLegend(map, kts, 'Zona / kategori'); summary(); }
+    function setBatas(list) { gBatas.clearLayers(); opts.batas = list || []; const kts = []; opts.batas.forEach(function (b) { const g = parse(b.geojson); if (!g) return; const ks = katsOf(g); if (ks.length) { ks.forEach(function (k) { kts.push(k); }); addGeo(g, null, b.kawasan, map).addTo(gBatas); } else L.polygon(latlngs(g), styleBatas()).bindTooltip(esc(b.kawasan), { sticky: true }).addTo(gBatas); }); setLegend(map, kts, 'Zona / kategori'); summary(); }
     let pts = [], complex = null, drawing = false, poly = null, markers = [];
     const COL = '#F26B4F';
     const g0 = parse(opts.geom);
@@ -255,7 +261,7 @@ const MapKit = (function () {
     function current() { if (complex) return complex; if (pts.length < 3) return null; const ring = pts.map(function (p) { return [p[1], p[0]]; }); ring.push(ring[0].slice()); return { type: 'Polygon', coordinates: [ring] }; }
     function render(fit) {
       if (poly) { map.removeLayer(poly); poly = null; } markers.forEach(function (m) { map.removeLayer(m); }); markers = [];
-      if (complex) { poly = addGeo(complex, { color: COL, weight: 2, fillOpacity: 0.3 }).addTo(map); const ks = katsOf(complex); setLegend(map, ks, 'Kategori area'); if (fit) map.fitBounds(poly.getBounds().pad(0.2)); }
+      if (complex) { poly = addGeo(complex, { color: COL, weight: 2, fillOpacity: 0.3 }, '', map).addTo(map); const ks = katsOf(complex); setLegend(map, ks, 'Kategori area'); if (fit) map.fitBounds(poly.getBounds().pad(0.2)); }
       else {
         if (pts.length >= 3) poly = L.polygon(pts, { color: COL, weight: 2, fillOpacity: 0.3 }).addTo(map); else if (pts.length === 2) poly = L.polyline(pts, { color: COL, weight: 2, dashArray: '4 4' }).addTo(map);
         pts.forEach(function (p, i) {
@@ -320,7 +326,7 @@ const MapKit = (function () {
         fetchArcgis(q('arc').value, 5).then(function (fc) { if (!fc.features.length) throw new Error('Layer tidak berisi fitur.'); setPending(fc); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message; });
       };
       q('ok').onclick = function () {
-        let g; try { g = normalize(pend ? withKat(pend.fc, q('kol').value) : parseText(q('txt').value), maxChars); } catch (e) { q('err').textContent = e.message; return; }
+        let g; try { g = normalize(pend ? withKat(pend.fc, q('kol').value) : parseText(q('txt').value), maxChars, maxVert); } catch (e) { q('err').textContent = e.message; return; }
         complex = null; const ps = polysOf(g.geom); if (!g.kats.length && ps.length === 1 && ps[0].length === 1) { pts = ps[0][0].slice(0, -1).map(function (p) { return [p[1], p[0]]; }); } else { pts = []; complex = g.geom; }
         setDrawing(false); render(true); changed(); if (g.note) toast('', 'Poligon ' + g.note + ' agar muat (' + g.vert + ' titik).'); if (g.kats.length) toast('ok', g.kats.length + ' kategori diberi warna berbeda.'); pn.remove();
       };

@@ -8,7 +8,7 @@
 
 const LS = {
   get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
-  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  set: function (k, v) { try { const t = JSON.stringify(v); if (t.length > 1500000) { localStorage.removeItem(k); return; } localStorage.setItem(k, t); } catch (e) {} },
   del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
 const JENIS_FALLBACK = [
