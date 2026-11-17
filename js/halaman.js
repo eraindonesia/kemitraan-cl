@@ -265,7 +265,7 @@ function hapusArea(p, id) {
 
 /* ----------------------------- Batas kawasan (Data Master) ----------------------------- */
 function batasCardHtml() {
-  return '<div class="card" style="margin-bottom:16px"><h3>Batas kawasan di peta</h3><p class="sub">Unggah batas tiap kawasan (GeoJSON atau gambar manual). Digunakan untuk memeriksa kesesuaian area usulan.</p><div id="batasList">' + skel() + '</div></div>';
+  return '<div class="card" style="margin-bottom:16px"><h3>Batas kawasan di peta</h3><p class="sub">Unggah batas tiap kawasan (Shapefile .zip, GeoJSON, atau gambar manual). Digunakan untuk memeriksa kesesuaian area usulan.</p><div id="batasList">' + skel() + '</div></div>';
 }
 function fillBatas() {
   const el = $('batasList'); if (!el) return;
@@ -274,7 +274,7 @@ function fillBatas() {
 }
 function openBatasModal(kaw) {
   const b = S.peta && S.peta.batas.filter(function (x) { return x.kawasan === kaw; })[0]; let ed = null;
-  modal({ title: 'Batas kawasan: ' + kaw, wide: true, ok: 'Simpan batas', sub: 'Impor GeoJSON batas resmi atau gambar poligon. Batas besar akan disederhanakan otomatis agar muat.',
+  modal({ title: 'Batas kawasan: ' + kaw, wide: true, ok: 'Simpan batas', sub: 'Impor Shapefile (.zip) / GeoJSON batas resmi atau gambar poligon. Batas besar akan disederhanakan otomatis agar muat.',
     body: '<div id="btMap"></div>', onOk: function () {
       const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Gambar atau impor batas terlebih dahulu.'; return false; }
       return api('batas_simpan', { kawasan: kaw, geojson: g }).then(function () { toast('ok', 'Batas kawasan tersimpan.'); fillBatas(); });

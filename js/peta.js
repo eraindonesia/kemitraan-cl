@@ -57,6 +57,31 @@ const MapKit = (function () {
     if (countVert(g) > MAX_VERT || JSON.stringify(g).length > maxChars) throw new Error('Poligon terlalu kompleks untuk disimpan. Potong atau sederhanakan di aplikasi GIS lalu impor ulang.');
     return { geom: g, note: note, luas: areaHa(g), vert: countVert(g) };
   }
+  /** Shapefile (.zip, atau gabungan .shp/.prj/.dbf) → GeoJSON FeatureCollection. Pustaka shpjs dimuat saat dibutuhkan (self-hosted). */
+  let shpLoad = null;
+  function loadShp() {
+    if (window.shp) return Promise.resolve(window.shp);
+    return shpLoad || (shpLoad = new Promise(function (res, rej) { const sc = document.createElement('script'); sc.src = 'vendor/shp/shp.min.js'; sc.onload = function () { window.shp ? res(window.shp) : rej(new Error('Pustaka Shapefile gagal dimuat.')); }; sc.onerror = function () { shpLoad = null; rej(new Error('Pustaka Shapefile gagal dimuat. Periksa koneksi lalu coba lagi.')); }; document.head.appendChild(sc); }));
+  }
+  function readBuf(f) { return new Promise(function (res, rej) { const r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = function () { rej(new Error('Berkas tidak dapat dibaca.')); }; r.readAsArrayBuffer(f); }); }
+  function ext(f) { return (f.name.split('.').pop() || '').toLowerCase(); }
+  function readShapefile(files) {
+    files = Array.prototype.slice.call(files); const zip = files.filter(function (f) { return ext(f) === 'zip'; })[0]; const shpf = files.filter(function (f) { return ext(f) === 'shp'; })[0]; const prjf = files.filter(function (f) { return ext(f) === 'prj'; })[0];
+    if (!zip && !shpf) return Promise.reject(new Error('Pilih berkas .zip Shapefile, atau berkas .shp (sertakan .prj dan .dbf).'));
+    if (files.some(function (f) { return f.size > 25 * 1024 * 1024; })) return Promise.reject(new Error('Berkas terlalu besar (maks. 25 MB). Sederhanakan atau potong di aplikasi GIS.'));
+    return loadShp().then(function (shp) {
+      if (zip) return readBuf(zip).then(function (b) { return shp(b); });
+      return Promise.all([readBuf(shpf), prjf ? prjf.text() : Promise.resolve(null)]).then(function (r) {
+        const geoms = shp.parseShp(r[0], r[1] || undefined); return { type: 'FeatureCollection', features: geoms.map(function (g) { return { type: 'Feature', properties: {}, geometry: g }; }), _tanpaPrj: !r[1] };
+      });
+    }).then(function (g) {
+      const cols = Array.isArray(g) ? g : [g]; const feats = []; cols.forEach(function (c) { (c.features || []).forEach(function (f) { feats.push(f); }); });
+      const polys = polysOf({ type: 'FeatureCollection', features: feats });
+      if (!polys.length) throw new Error('Shapefile ini tidak berisi poligon (mungkin titik/garis). Gunakan layer Polygon.');
+      const sample = polys[0][0][0]; if (!sample || Math.abs(sample[0]) > 180 || Math.abs(sample[1]) > 90) throw new Error('Koordinat Shapefile bukan derajat (kemungkinan UTM) dan tidak dapat dikonversi. Sertakan berkas .prj dalam ZIP, atau ekspor ulang dengan CRS WGS 84 (EPSG:4326).');
+      return { type: 'FeatureCollection', features: feats, _n: polys.length };
+    });
+  }
   /** Teks bebas → geometri. Menerima GeoJSON atau baris "lintang,bujur" (min. 3 titik). */
   function parseText(text) {
     const t = String(text || '').trim(); if (!t) throw new Error('Data kosong.');
@@ -170,14 +195,23 @@ const MapKit = (function () {
     function doImport() {
       let pn = host.querySelector('.imp'); if (pn) { pn.remove(); return; }
       pn = document.createElement('div'); pn.className = 'imp card';
-      pn.innerHTML = '<p class="sub" style="margin-bottom:8px">Tempel <b>GeoJSON</b> (Polygon / MultiPolygon / Feature / FeatureCollection, koordinat [bujur, lintang]) <b>atau</b> daftar titik, satu per baris: <code>lintang,bujur</code>. Atau pilih berkas .geojson / .json.</p>' +
-        '<textarea class="in" data-imp="txt" rows="6" placeholder="-0.8917,119.8707&#10;-0.8920,119.8750&#10;-0.8950,119.8730"></textarea><input type="file" data-imp="file" accept=".geojson,.json,.txt,application/json" style="margin-top:8px">' +
+      pn.innerHTML = '<p class="sub" style="margin-bottom:8px">Tempel <b>GeoJSON</b> (Polygon / MultiPolygon / Feature / FeatureCollection, koordinat [bujur, lintang]) <b>atau</b> daftar titik, satu per baris: <code>lintang,bujur</code>. Atau pilih berkas <b>Shapefile</b> (.zip, atau .shp + .prj + .dbf sekaligus) / .geojson / .json.</p>' +
+        '<textarea class="in" data-imp="txt" rows="6" placeholder="-0.8917,119.8707&#10;-0.8920,119.8750&#10;-0.8950,119.8730"></textarea><input type="file" data-imp="file" multiple accept=".zip,.shp,.dbf,.prj,.cpg,.shx,.geojson,.json,.txt,application/json,application/zip" style="margin-top:8px"><div class="hint" data-imp="info" style="margin-top:6px"></div>' +
         '<div class="errtxt" data-imp="err" role="alert"></div><div class="btns" style="margin-top:8px"><button type="button" class="btn btn-o btn-s" data-imp="cancel">Batal</button><button type="button" class="btn btn-p btn-s" data-imp="ok">Gunakan</button></div>';
       host.insertBefore(pn, box); const q = function (k) { return pn.querySelector('[data-imp="' + k + '"]'); };
       q('cancel').onclick = function () { pn.remove(); };
-      q('file').onchange = function () { const f = this.files[0]; if (!f) return; if (f.size > 3 * 1024 * 1024) { q('err').textContent = 'Berkas terlalu besar (maks. 3 MB).'; return; } const r = new FileReader(); r.onload = function () { q('txt').value = r.result; }; r.readAsText(f); };
+      let shpGeo = null; q('txt').addEventListener('input', function () { shpGeo = null; });
+      q('file').onchange = function () {
+        const fs = Array.prototype.slice.call(this.files); if (!fs.length) return; q('err').textContent = ''; q('info').textContent = ''; shpGeo = null;
+        if (fs.some(function (f) { return ['zip', 'shp'].indexOf(ext(f)) > -1; })) {
+          q('info').textContent = 'Membaca Shapefile…';
+          readShapefile(fs).then(function (g) { shpGeo = g; q('txt').value = ''; q('info').innerHTML = '&#10003; Shapefile terbaca: <b>' + g._n + '</b> poligon. Klik <b>Gunakan</b>.'; }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message || 'Shapefile tidak dapat dibaca.'; });
+          return;
+        }
+        const f = fs[0]; if (f.size > 3 * 1024 * 1024) { q('err').textContent = 'Berkas terlalu besar (maks. 3 MB).'; return; } const r = new FileReader(); r.onload = function () { q('txt').value = r.result; }; r.readAsText(f);
+      };
       q('ok').onclick = function () {
-        let g; try { g = normalize(parseText(q('txt').value), maxChars); } catch (e) { q('err').textContent = e.message; return; }
+        let g; try { g = normalize(shpGeo || parseText(q('txt').value), maxChars); } catch (e) { q('err').textContent = e.message; return; }
         complex = null; const ps = polysOf(g.geom); if (ps.length === 1 && ps[0].length === 1) { pts = ps[0][0].slice(0, -1).map(function (p) { return [p[1], p[0]]; }); } else { pts = []; complex = g.geom; }
         setDrawing(false); render(true); changed(); if (g.note) toast('', 'Poligon ' + g.note + ' agar muat (' + g.vert + ' titik).'); pn.remove();
       };
