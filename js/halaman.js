@@ -264,6 +264,11 @@ function hapusArea(p, id) {
 }
 
 /* ----------------------------- Batas kawasan (Data Master) ----------------------------- */
+function arcRow(l) { return '<input class="in" data-an placeholder="Nama layer" value="' + esc(l.nama || '') + '"><input class="in" data-au placeholder="https://services.arcgis.com/…/FeatureServer/0" value="' + esc(l.url || '') + '"><input class="in" data-ak placeholder="Kolom kategori (opsional)" value="' + esc(l.kolom || '') + '"><span style="white-space:nowrap"><button type="button" class="btn btn-o btn-s" data-act="arcTest">Uji</button> <button type="button" class="btn btn-o btn-s" data-act="arcDel" aria-label="Hapus layer">' + mi('delete') + '</button></span>'; }
+function arcCardHtml() {
+  const L = ((S.master && S.master.config && S.master.config.arcgis_layers) || []);
+  return '<div class="card" style="margin-bottom:16px"><h3>Integrasi ArcGIS Online</h3><p class="sub">Tampilkan layer ArcGIS Online (publik) sebagai lapisan di semua peta — pilih lewat ikon lapisan di pojok peta. Layer fitur (<code>…/FeatureServer/0</code>) dimuat sebagai poligon berwarna per kolom kategori; layer tile (<code>…/MapServer</code>) sebagai peta latar. Layer yang sama bisa diimpor sebagai batas/area lewat tombol <i>Isi koordinat / Impor</i>. Hanya layer berbagi <b>Publik</b> dari <code>*.arcgis.com</code>.</p><div id="arcList">' + L.map(function (l) { return '<div class="arc-row">' + arcRow(l) + '</div>'; }).join('') + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-o btn-s" data-act="arcAdd">' + mi('add') + ' Tambah layer</button><button type="button" class="btn btn-o btn-s" data-act="exportGeo">' + mi('download') + ' Ekspor batas &amp; area (GeoJSON untuk ArcGIS)</button></div><p class="hint" style="margin-top:8px">Klik <b>Simpan semua</b> di atas setelah mengubah daftar layer.</p></div>';
+}
 function batasCardHtml() {
   return '<div class="card" style="margin-bottom:16px"><h3>Batas kawasan di peta</h3><p class="sub">Unggah batas tiap kawasan (Shapefile .zip, GeoJSON, atau gambar manual). Digunakan untuk memeriksa kesesuaian area usulan.</p><div id="batasList">' + skel() + '</div></div>';
 }
@@ -299,6 +304,18 @@ Object.assign(ACT, {
   areaAdd: function () { openAreaModal(curP(), null); },
   areaEdit: function (el) { const d = detData(); openAreaModal(curP(), d.areas.filter(function (a) { return a.id === el.dataset.id; })[0]); },
   areaDel: function (el) { hapusArea(curP(), el.dataset.id); },
+  arcAdd: function () { const w = $('arcList'); const d = document.createElement('div'); d.className = 'arc-row'; d.innerHTML = arcRow({}); w.appendChild(d); },
+  arcDel: function (el) { el.closest('.arc-row').remove(); },
+  arcTest: function (el) { const r = el.closest('.arc-row'); const u = r.querySelector('[data-au]').value; el.disabled = true; const old = el.textContent; el.textContent = 'Menguji…';
+    MapKit.fetchArcgis(u, 1).then(function (fc) { const n = fc.features.length; const keys = Object.keys((fc.features[0] || {}).properties || {}); toast('ok', 'Terhubung: ' + n + (n >= 1000 ? '+' : '') + ' fitur. Kolom: ' + keys.slice(0, 8).join(', ') + (keys.length > 8 ? '…' : '')); }).catch(function (e) { toast('bad', e.message); }).then(function () { el.disabled = false; el.textContent = old; }); },
+  exportGeo: function () {
+    const feats = []; ((S.peta && S.peta.batas) || []).forEach(function (b) { let g; try { g = typeof b.geojson === 'string' ? JSON.parse(b.geojson) : b.geojson; } catch (e) { return; } if (!g) return; const add = function (geom, kat) { feats.push({ type: 'Feature', properties: { jenis: 'Batas kawasan', kawasan: b.kawasan, kategori: kat || '', luas_ha: b.luas_ha }, geometry: geom }); };
+      if (g.type === 'FeatureCollection') g.features.forEach(function (f) { add(f.geometry, f.properties && f.properties.kategori); }); else add(g, ''); });
+    ((S.peta && S.peta.areas) || []).forEach(function (a) { let g; try { g = typeof a.geojson === 'string' ? JSON.parse(a.geojson) : a.geojson; } catch (e) { return; } if (!g) return; const add = function (geom, kat) { feats.push({ type: 'Feature', properties: { jenis: 'Area pengelolaan', kawasan: a.kawasan, nomor: a.nomor, mitra: a.lembaga, nama_area: a.nama, kategori: kat || '', status: a.status, luas_ha: a.luas_ha }, geometry: geom }); };
+      if (g.type === 'FeatureCollection') g.features.forEach(function (f) { add(f.geometry, f.properties && f.properties.kategori); }); else add(g, ''); });
+    if (!feats.length) { toast('bad', 'Belum ada batas atau area untuk diekspor.'); return; }
+    const blob = new Blob([JSON.stringify({ type: 'FeatureCollection', features: feats })], { type: 'application/geo+json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'si-mitra-peta-' + new Date().toISOString().slice(0, 10) + '.geojson'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); toast('ok', feats.length + ' fitur diekspor. Di ArcGIS Online: Content → New item → Your device.');
+  },
   batasEdit: function (el) { openBatasModal(el.dataset.k); }, batasDel: function (el) { hapusBatas(el.dataset.k); }
 });
 Object.assign(CHG, {
