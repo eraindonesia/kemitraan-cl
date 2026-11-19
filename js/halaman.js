@@ -211,7 +211,7 @@ function vPeta() {
     $('petaEmpty').textContent = (!pt.areas.length && !pt.batas.length) ? 'Belum ada area atau batas yang diunggah. Mitra menggambar area pada pengajuannya; Admin mengunggah batas di Data Master & Batas.' : '';
   };
   S._pdraw = draw;
-  S._pm = MapKit.overview($('petaMap'), { onOpen: function (id) { navigateTo('detail', { id: id }); }, onClick: cek });
+  S._pm = MapKit.overview($('petaMap'), { onOpen: function (id) { navigateTo('detail', { id: id }); }, onClick: cek, fitAreas: true });
   draw(); loadPeta().then(draw).catch(function (e) { $('petaSum').textContent = e.message; });
   if (S.params.cek) setTimeout(function () { const i = $('cekIn'); if (i) i.focus(); }, 100);
 }
@@ -244,12 +244,12 @@ function tPeta(p, d) {
     return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(a.nama) + '</div><div class="t-sub">' + 'oleh ' + esc(a.pembuat) + ' · ' + fmtD(a.diubah) + '</div><span class="chip ' + cls + '" style="margin-top:4px" title="' + esc(c.teks) + '">' + lb + '</span></div>' +
       (edit ? '<div style="display:flex;gap:6px"><button class="btn btn-o btn-s" data-act="areaEdit" data-id="' + esc(a.id) + '">' + mi('edit', 'font-size:16px') + '</button><button class="btn btn-o btn-s" data-act="areaDel" data-id="' + esc(a.id) + '" aria-label="Hapus area">' + mi('delete', 'font-size:16px') + '</button></div>' : '') + '</div>';
   }).join('') || '<div class="empty" style="padding:22px">' + mi('location_off') + 'Belum ada area pengelolaan.</div>';
-  return '<div class="grid g-main"><div class="card"><h3>Peta area pengelolaan</h3><p class="sub">Area diusulkan di ' + esc(p.kawasan) + ' (garis putus-putus = batas kawasan).</p><div class="mapbox" id="detMap"></div></div>' +
+  return '<div class="grid g-main"><div class="card"><h3>Peta area pengelolaan</h3><p class="sub">Area yang diajukan mitra di ' + esc(p.kawasan) + (isStaff() ? ' — peta langsung memperbesar ke area usulan' : '') + ' (garis putus-putus = batas kawasan).</p><div class="mapbox" id="detMap"></div></div>' +
     '<div class="card"><h3>Daftar area</h3><p class="sub">' + areas.length + ' area</p>' + items + (edit ? '<button class="btn btn-p btn-block" style="margin-top:12px" data-act="areaAdd">' + mi('add_location_alt') + ' Tambah area</button>' : '') + '</div></div>';
 }
 function afterDetailRender() {
   if (S.view !== 'detail' || S.tab !== 'peta') return; const p = pById(S.params.id), d = detData(), el = $('detMap'); if (!p || !d || !el) return;
-  const ov = MapKit.overview(el, { onOpen: function () {} }); if (!ov) return;
+  const ov = MapKit.overview(el, { onOpen: function () {}, fitAreas: true }); if (!ov) return;
   const draw = function () { ov.update((S.peta ? S.peta.batas : []).filter(function (b) { return b.kawasan === p.kawasan; }), (d.areas || []).map(function (a) { return Object.assign({}, a, { judul: p.judul, nomor: p.nomor, lembaga: p.lembaga, status: p.status, tahap: p.tahap, id_pengajuan: p.id }); })); };
   draw(); if (!S.peta) loadPeta().then(function () { if (S.view === 'detail' && S.tab === 'peta') renderDetailBody(); }).catch(function () {});
 }

@@ -106,6 +106,17 @@ function downloadFile(id) {
     const url = URL.createObjectURL(new Blob([arr], { type: r.mime })); const a = document.createElement('a'); a.href = url; a.download = r.nama; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }).catch(function (e) { toast('bad', e.message); });
 }
+/** Pratinjau berkas (PDF/JPG/PNG) di jendela dalam aplikasi; berkas diambil lewat berkas_ambil lalu ditampilkan dari blob lokal. */
+let viewUrl = null;
+function viewFile(id) {
+  toast('', 'Membuka berkas…');
+  api('berkas_ambil', { id_berkas: id }).then(function (r) {
+    const bin = atob(r.base64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    if (viewUrl) URL.revokeObjectURL(viewUrl); viewUrl = URL.createObjectURL(new Blob([arr], { type: r.mime }));
+    const img = /^image\//.test(r.mime);
+    modal({ title: r.nama, wide: true, hideCancel: true, body: '<div class="viewer">' + (img ? '<img src="' + viewUrl + '" alt="' + esc(r.nama) + '">' : '<iframe src="' + viewUrl + '" title="' + esc(r.nama) + '"></iframe>') + '</div><div style="margin-top:10px"><button type="button" class="btn btn-o btn-s" data-act="dl" data-id="' + esc(id) + '">' + mi('download') + ' Unduh berkas</button></div>' });
+  }).catch(function (e) { toast('bad', e.message); });
+}
 function deleteFile(id) {
   modal({ title: 'Hapus berkas?', body: '<p>Berkas akan dipindahkan ke tempat sampah Drive.</p>', ok: 'Hapus', danger: true, onOk: function () {
     return api('berkas_hapus', { id_berkas: id }).then(function () { const c = S.det[S.params.id]; if (c && c.d) c.d.berkas = c.d.berkas.filter(function (b) { return b.id !== id; }); renderDetailBody(); toast('ok', 'Berkas dihapus.'); });
@@ -121,9 +132,9 @@ function vUsers() {
   setTitle('Pengguna'); setView('<div class="ph"><div><h2>Manajemen pengguna</h2><p>Kelola akun internal dan mitra.</p></div><div class="sp"></div><button class="btn btn-p" data-act="addUser">' + mi('person_add') + ' Tambah pengguna</button></div><div id="uCfg">' + googleCard() + '</div><div id="uBody">' + skel() + '</div>');
   const draw = function () {
     $('uCfg').innerHTML = googleCard();
-    $('uBody').innerHTML = '<div class="tbl-wrap"><table><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Lembaga</th><th>Jenis mitra</th><th>Status</th><th></th></tr></thead><tbody>' + S.users.map(function (u) {
+    $('uBody').innerHTML = '<div class="tbl-wrap"><table><thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Lembaga</th><th>Jenis mitra / wilayah</th><th>Status</th><th></th></tr></thead><tbody>' + S.users.map(function (u) {
       const id = esc(u.id), me = S.me && u.id === S.me.id;
-      return '<tr style="cursor:default"><td class="t-b">' + esc(u.nama) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.peran_nama) + '</td><td>' + esc(u.lembaga) + '</td><td>' + (u.peran === 'mitra' ? (u.jenis_mitra ? esc(jenisNama(u.jenis_mitra)) : '<span class="hint">Belum diatur</span>') : '-') + '</td><td><span class="chip ' + (u.aktif ? 'c-ok' : 'c-bad') + '">' + (u.aktif ? 'Aktif' : 'Nonaktif') + '</span></td><td style="white-space:nowrap"><button class="btn btn-o btn-s" data-act="editUser" data-id="' + id + '">Ubah</button> ' +
+      return '<tr style="cursor:default"><td class="t-b">' + esc(u.nama) + '</td><td>' + esc(u.email) + '</td><td>' + esc(u.peran_nama) + '</td><td>' + esc(u.lembaga) + '</td><td>' + (u.peran === 'mitra' ? (u.jenis_mitra ? esc(jenisNama(u.jenis_mitra)) : '<span class="hint">Belum diatur</span>') : (['admin', 'uptd'].indexOf(u.peran) > -1 ? esc(u.wilayah_nama || 'Semua wilayah') : '-')) + '</td><td><span class="chip ' + (u.aktif ? 'c-ok' : 'c-bad') + '">' + (u.aktif ? 'Aktif' : 'Nonaktif') + '</span></td><td style="white-space:nowrap"><button class="btn btn-o btn-s" data-act="editUser" data-id="' + id + '">Ubah</button> ' +
         (me ? '' : '<button class="btn btn-o btn-s" data-act="toggleUser" data-id="' + id + '">' + (u.aktif ? 'Nonaktifkan' : 'Aktifkan') + '</button> ') +
         (googleOnlyUI() ? '' : '<button class="btn btn-o btn-s" data-act="resetUser" data-id="' + id + '">Reset sandi</button> ') +
         (u.peran === 'mitra' && !me ? '<button class="btn btn-o btn-s" style="color:var(--bad,#b3261e)" data-act="delUser" data-id="' + id + '">' + mi('delete') + ' Hapus</button>' : '') + '</td></tr>';
@@ -131,11 +142,14 @@ function vUsers() {
   };
   if (S.users) draw(); api('daftar_user').then(function (u) { S.users = u; if (S.view === 'users') draw(); }).catch(function (e) { toast('bad', e.message); });
 }
+function wilFld(id, sel) {
+  return '<div class="fld"><label>Wilayah UPTD</label><select class="in" id="' + id + '"><option value="">Semua wilayah</option>' + ((S.master && S.master.wilayah) || []).map(function (w) { return '<option value="' + esc(w.kode) + '"' + (w.kode === sel ? ' selected' : '') + '>' + esc(w.nama) + '</option>'; }).join('') + '</select><p class="hint">Admin/UPTD hanya melihat pengajuan dari wilayahnya. Kosongkan untuk melihat semua wilayah.</p></div>';
+}
 function jenisOpts(sel) { return '<option value="">— Pilih jenis mitra —</option>' + ((S.master && S.master.jenis) || []).map(function (j) { return '<option value="' + esc(j.kode) + '"' + (j.kode === sel ? ' selected' : '') + '>' + esc(j.nama) + '</option>'; }).join(''); }
 function editUser(u) {
   const mitra = u.peran === 'mitra';
-  modal({ title: 'Ubah pengguna', sub: esc(u.email), body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="euN" value="' + esc(u.nama) + '"></div><div class="fld"><label>Email' + (googleOnlyUI() ? ' Google' : '') + '</label><input class="in" type="email" id="euE" value="' + esc(u.email) + '"></div><div class="row2"><div class="fld"><label>Lembaga</label><input class="in" id="euL" value="' + esc(u.lembaga) + '"></div><div class="fld"><label>Jabatan</label><input class="in" id="euJ" value="' + esc(u.jabatan) + '"></div></div><div class="row2"><div class="fld"><label>Telepon / WhatsApp</label><input class="in" id="euT" value="' + esc(u.telepon) + '"></div>' + (mitra ? '<div class="fld"><label>Jenis mitra</label><select class="in" id="euM">' + jenisOpts(u.jenis_mitra) + '</select></div>' : '') + '</div>' + (mitra ? '<p class="hint">Jenis mitra menentukan daftar dokumen persyaratan. Pengajuan yang masih tahap 1 ikut diperbarui.</p>' : ''), ok: 'Simpan', onOk: function () {
-    const d = { id: u.id, nama: $('euN').value, email: $('euE').value, lembaga: $('euL').value, jabatan: $('euJ').value, telepon: $('euT').value }; if (mitra) d.jenis_mitra = $('euM').value;
+  modal({ title: 'Ubah pengguna', sub: esc(u.email), body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="euN" value="' + esc(u.nama) + '"></div><div class="fld"><label>Email' + (googleOnlyUI() ? ' Google' : '') + '</label><input class="in" type="email" id="euE" value="' + esc(u.email) + '"></div><div class="row2"><div class="fld"><label>Lembaga</label><input class="in" id="euL" value="' + esc(u.lembaga) + '"></div><div class="fld"><label>Jabatan</label><input class="in" id="euJ" value="' + esc(u.jabatan) + '"></div></div><div class="row2"><div class="fld"><label>Telepon / WhatsApp</label><input class="in" id="euT" value="' + esc(u.telepon) + '"></div>' + (mitra ? '<div class="fld"><label>Jenis mitra</label><select class="in" id="euM">' + jenisOpts(u.jenis_mitra) + '</select></div>' : '') + '</div>' + (mitra ? '<p class="hint">Jenis mitra menentukan daftar dokumen persyaratan. Pengajuan yang masih tahap 1 ikut diperbarui.</p>' : '') + (['admin', 'uptd'].indexOf(u.peran) > -1 ? wilFld('euW', u.wilayah) : ''), ok: 'Simpan', onOk: function () {
+    const d = { id: u.id, nama: $('euN').value, email: $('euE').value, lembaga: $('euL').value, jabatan: $('euJ').value, telepon: $('euT').value }; if (mitra) d.jenis_mitra = $('euM').value; if ($('euW')) d.wilayah = $('euW').value;
     return api('ubah_user', d).then(function (r) { Object.assign(u, r.user); if (S.view === 'users') vUsers(); toast('ok', 'Data pengguna disimpan.'); });
   } });
 }
@@ -166,8 +180,8 @@ function gAtur() {
 function showPw(title, user, pw) { modal({ title: title, body: '<p>Akun: <b>' + esc(user.email) + '</b></p><p style="margin-top:8px">Kata sandi sementara:</p><div class="card" style="font-family:monospace;font-size:18px;text-align:center;padding:12px;margin-top:6px;user-select:all">' + esc(pw) + '</div><p class="hint" style="margin-top:8px">Catat sekarang; kata sandi tidak ditampilkan lagi.</p>', hideCancel: true }); }
 function addUser() {
   const roles = [['prl', 'Tim Bidang PRL'], ['uptd', 'UPTD Pengelola Kawasan'], ['kepala_dkp', 'Kepala Dinas'], ['admin', 'Admin (UPTD) — validasi & unggah TTD'], ['superadmin', 'Super Admin'], ['mitra', 'Mitra']];
-  modal({ title: 'Tambah pengguna', body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="auN"></div><div class="fld"><label>' + (googleOnlyUI() ? 'Email Google' : 'Email') + ' <i>*</i></label><input class="in" type="email" id="auE"></div><div class="row2"><div class="fld"><label>Peran <i>*</i></label><select class="in" id="auR">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div><div class="fld"><label>Lembaga</label><input class="in" id="auL"></div></div>', ok: 'Buat akun', onOk: function () {
-    return api('buat_user', { nama: $('auN').value, email: $('auE').value, peran: $('auR').value, lembaga: $('auL').value }).then(function (r) { S.users = null; setTimeout(function () { if (r.password) showPw('Akun dibuat', r.user, r.password); else modal({ title: 'Akun dibuat', body: '<p>Pengguna <b>' + esc(r.user.email) + '</b> dapat langsung masuk dengan tombol <b>Masuk dengan Google</b> memakai akun Google tersebut. Tidak ada kata sandi yang perlu dibagikan.</p>', ok: 'Mengerti', hideCancel: true, onOk: function () { closeModal(); } }); if (S.view === 'users') vUsers(); }, 50); });
+  modal({ title: 'Tambah pengguna', body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="auN"></div><div class="fld"><label>' + (googleOnlyUI() ? 'Email Google' : 'Email') + ' <i>*</i></label><input class="in" type="email" id="auE"></div><div class="row2"><div class="fld"><label>Peran <i>*</i></label><select class="in" id="auR">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div><div class="fld"><label>Lembaga</label><input class="in" id="auL"></div></div>' + wilFld('auW', '') + '<p class="hint">Wilayah hanya berlaku untuk peran Admin (UPTD) dan UPTD. Buat satu akun Admin untuk tiap wilayah.</p>', ok: 'Buat akun', onOk: function () {
+    return api('buat_user', { nama: $('auN').value, email: $('auE').value, peran: $('auR').value, lembaga: $('auL').value, wilayah: $('auW').value }).then(function (r) { S.users = null; setTimeout(function () { if (r.password) showPw('Akun dibuat', r.user, r.password); else modal({ title: 'Akun dibuat', body: '<p>Pengguna <b>' + esc(r.user.email) + '</b> dapat langsung masuk dengan tombol <b>Masuk dengan Google</b> memakai akun Google tersebut. Tidak ada kata sandi yang perlu dibagikan.</p>', ok: 'Mengerti', hideCancel: true, onOk: function () { closeModal(); } }); if (S.view === 'users') vUsers(); }, 50); });
   } });
 }
 
@@ -176,12 +190,15 @@ function vMaster() {
   setTitle('Data Master'); const m = S.master;
   setView('<div class="ph"><div><h2>Data master</h2><p>Kawasan, persyaratan per jenis mitra, dan kontak bantuan.</p></div><div class="sp"></div><button class="btn btn-p" data-act="saveMaster">' + mi('save') + ' Simpan semua</button></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Kawasan konservasi</h3><p class="sub">Satu baris per kawasan. Format: <code>Nama | Dasar hukum | Zona1; Zona2</code></p><textarea class="in" id="mKaw" rows="6">' + esc(m.kawasan.map(function (k) { return k.nama + ' | ' + (k.dasar || '') + ' | ' + k.zona.join('; '); }).join('\n')) + '</textarea></div>' +
+    '<div class="card" style="margin-bottom:16px"><h3>Wilayah UPTD</h3><p class="sub">Mitra memilih wilayah tempat kegiatan; pengajuan ditangani Admin/UPTD wilayah tersebut. Ubah nama dan cakupan sesuai wilayah kerja. Kode (W1, W2, …) tetap dan tidak dapat dihapus selama masih dipakai.</p><div id="wilList">' + ((m.wilayah || []).map(wilRow).join('')) + '</div><button type="button" class="btn btn-o btn-s" data-act="wilAdd">' + mi('add') + ' Tambah wilayah</button></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Program Dinas yang ditawarkan ke mitra</h3><p class="sub">Satu program per baris. Format: <code>Nama program | Deskripsi singkat</code>. Tambahkan <code>| nonaktif</code> di akhir baris untuk menyembunyikan dari pilihan mitra tanpa menghapus riwayatnya.</p><textarea class="in" id="mProg" rows="12">' + esc(progLinesText()) + '</textarea></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Persyaratan per jenis mitra</h3><p class="sub">Satu persyaratan per baris.</p>' + m.jenis.map(function (j) { return '<div class="fld"><label>' + esc(j.nama) + '</label><textarea class="in" rows="3" data-mj="' + esc(j.kode) + '">' + esc((m.persyaratan[j.kode] || []).join('\n')) + '</textarea></div>'; }).join('') + '</div>' +
     batasCardHtml() + warnaCardHtml() + arcCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div></div>');
   fillBatas();
 }
 /** Baris: "Nama | Deskripsi | nonaktif(opsional)". Id lama dipertahankan bila nama sama. */
+function wilRow(w) { return '<div class="wil-row" data-kode="' + esc(w.kode || '') + '"><span class="chip c-draft" style="min-width:44px;text-align:center">' + esc(w.kode || 'baru') + '</span><input class="in" data-wn placeholder="Nama wilayah UPTD" value="' + esc(w.nama || '') + '"><input class="in" data-wc placeholder="Cakupan (kabupaten/kecamatan)" value="' + esc(w.cakupan || '') + '"></div>'; }
+function wilParse() { return Array.prototype.map.call(document.querySelectorAll('#wilList .wil-row'), function (r) { return { kode: r.dataset.kode, nama: r.querySelector('[data-wn]').value, cakupan: r.querySelector('[data-wc]').value }; }); }
 function progLinesText() { return ((S.master && S.master.program) || []).map(function (x) { return x.nama + ' | ' + (x.deskripsi || '') + (x.aktif ? '' : ' | nonaktif'); }).join('\n'); }
 function progLinesParse() {
   const lama = {}; ((S.master && S.master.program) || []).forEach(function (x) { lama[x.nama.trim().toLowerCase()] = x.id; });
@@ -192,7 +209,7 @@ function progLinesParse() {
 function saveMaster(btn) {
   const kaw = $('mKaw').value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) { const p = l.split('|'); return { nama: (p[0] || '').trim(), dasar: (p[1] || '').trim(), zona: (p[2] || '').split(';').map(function (z) { return z.trim(); }).filter(Boolean) }; });
   const per = {}; document.querySelectorAll('[data-mj]').forEach(function (t) { per[t.dataset.mj] = t.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); });
-  loadingBtn(btn, true); api('master_simpan', { kawasan: kaw, persyaratan: per, config: { helpdesk_email: $('mHE').value, helpdesk_telp: $('mHT').value, arcgis_layers: Array.prototype.map.call(document.querySelectorAll('#arcList .arc-row'), function (r) { return { nama: r.querySelector('[data-an]').value, url: r.querySelector('[data-au]').value, kolom: r.querySelector('[data-ak]').value }; }).filter(function (l) { return l.nama.trim() || l.url.trim(); }) } }).then(function (m) { S.master = m; return api('program_simpan', { programs: progLinesParse() }).then(function (pr) { S.master.program = pr; persist(); toast('ok', 'Data master tersimpan.'); }); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(btn, false); });
+  loadingBtn(btn, true); api('master_simpan', { kawasan: kaw, persyaratan: per, config: { helpdesk_email: $('mHE').value, helpdesk_telp: $('mHT').value, arcgis_layers: Array.prototype.map.call(document.querySelectorAll('#arcList .arc-row'), function (r) { return { nama: r.querySelector('[data-an]').value, url: r.querySelector('[data-au]').value, kolom: r.querySelector('[data-ak]').value }; }).filter(function (l) { return l.nama.trim() || l.url.trim(); }) } }).then(function (m) { S.master = m; return api('wilayah_simpan', { wilayah: wilParse() }).then(function (wl) { S.master.wilayah = wl; return api('program_simpan', { programs: progLinesParse() }); }).then(function (pr) { S.master.program = pr; persist(); toast('ok', 'Data master tersimpan.'); }); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(btn, false); });
 }
 
 /* ----------------------------- Akun ----------------------------- */
@@ -259,10 +276,10 @@ const ACT = {
   },
   batalJadwal: function () { const p = curP(), d = ensureDet(); modal({ title: 'Batalkan jadwal pemaparan?', body: '<p>Mitra akan diberi tahu. Pemaparan tidak dapat ditandai selesai sebelum jadwal baru ditetapkan.</p>', ok: 'Batalkan jadwal', danger: true, onOk: function () { return api('jadwal_simpan', { id: p.id, batalkan: true }).then(function (r) { d.jadwal = r; renderDetailBody(); toast('ok', 'Jadwal dibatalkan.'); }); } }); },
   saveCk: saveChecklist, saveTp: saveTelaahProgram, saveTb: saveTelaahBiaya, saveMv: saveMonev,
-  progAdd: function () { const d = S.wiz.data; d.programs = progList(d).concat([{ jenis: 'mandiri', id_program: '', nama: '', keterangan: '' }]); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
+  wilAdd: function () { $('wilList').insertAdjacentHTML('beforeend', wilRow({})); }, progAdd: function () { const d = S.wiz.data; d.programs = progList(d).concat([{ jenis: 'mandiri', id_program: '', nama: '', keterangan: '' }]); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
   progDel: function (el) { const d = S.wiz.data; const own = progList(d).filter(function (x) { return x.jenis === 'mandiri'; })[+el.dataset.i]; d.programs = progList(d).filter(function (x) { return x !== own; }); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
   ttdUp: function (el) { ttdUpload(el, el.dataset.j); }, savePks: function (el) { savePKS(el); },
-  dl: function (el, e) { e.preventDefault(); downloadFile(el.dataset.id); }, delFile: function (el) { deleteFile(el.dataset.id); },
+  dl: function (el, e) { e.preventDefault(); downloadFile(el.dataset.id); }, view: function (el, e) { e.preventDefault(); viewFile(el.dataset.id); }, delFile: function (el) { deleteFile(el.dataset.id); },
   addUser: addUser, saveMaster: saveMaster, gAtur: gAtur,
   editUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; if (u) editUser(u); },
   delUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; if (u) delUser(u); },

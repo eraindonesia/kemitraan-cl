@@ -513,3 +513,11 @@ body{background:var(--bg);-webkit-font-smoothing:antialiased}
 .angg-grid .kpi-a{padding:12px;border:1px solid var(--line);border-radius:10px}
 .angg-grid .kpi-a b{display:block;font-size:20px}
 .angg-grid .kpi-a small{color:var(--tx-2)}
+
+/* v3.1 — pratinjau & tombol berkas */
+.file .fn{overflow-wrap:anywhere}
+.file .fbtn{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--teal,#0e8f94);border:1px solid var(--line);border-radius:6px;padding:2px 8px;background:var(--card,#fff)}
+.file .fbtn:hover{background:var(--bg);color:var(--teal,#0e8f94)}
+.viewer{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--bg);max-height:70vh}
+.viewer iframe{width:100%;height:70vh;border:0;display:block}.viewer img{max-width:100%;display:block;margin:0 auto}
+.wil-row{display:grid;grid-template-columns:auto 1fr 1.4fr;gap:8px;align-items:center;margin-bottom:8px}@media(max-width:640px){.wil-row{grid-template-columns:1fr}}

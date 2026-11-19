@@ -4,7 +4,7 @@ function vForm() {
   const id = S.params.id; setTitle(id ? 'Ubah Pengajuan' : 'Ajukan Kemitraan');
   if (!S.wiz || S.wiz.editId !== (id || null)) {
     const p = id && pById(id); const saved = !id && LS.get('sm_form');
-    S.wiz = { step: 0, editId: id || null, data: p ? { judul: p.judul, uraian: p.uraian, jangka: p.jangka, kawasan: p.kawasan, zona: p.zona, lokasi: p.lokasi, luas: p.luas, biaya: p.biaya, sumber: p.sumber } : (saved || {}) };
+    S.wiz = { step: 0, editId: id || null, data: p ? { judul: p.judul, uraian: p.uraian, jangka: p.jangka, kawasan: p.kawasan, zona: p.zona, wilayah: p.wilayah, lokasi: p.lokasi, luas: p.luas, biaya: p.biaya, sumber: p.sumber } : (saved || {}) };
     if (id) { const cd = S.det[id] && S.det[id].d; if (cd) S.wiz.data.programs = progFromDet(cd.programs); else loadDetail(id).then(function (r) { if (S.wiz && S.wiz.editId === id && S.wiz.data.programs === undefined) { S.wiz.data.programs = progFromDet(r.programs); if (S.view === 'form') renderWiz(); } }); }
   }
   if (isSuper() && !S.users) api('daftar_user').then(function (u) { S.users = u; if (S.view === 'form') renderWiz(); }).catch(function () {});
@@ -24,7 +24,8 @@ function renderWiz() {
       '<div class="fld"><label>Jangka waktu kemitraan</label><input class="in" data-f="jangka" placeholder="mis. 3 Tahun" value="' + f('jangka') + '"></div>' + progPicker(d);
   } else if (st === 2) {
     const k = S.master.kawasan.filter(function (x) { return x.nama === d.kawasan; })[0]; const zs = k ? k.zona : [];
-    c = '<div class="row2"><div class="fld"><label>Kawasan konservasi <i>*</i></label><select class="in" data-f="kawasan"><option value="">Pilih kawasan…</option>' + S.master.kawasan.map(function (x) { return '<option' + (d.kawasan === x.nama ? ' selected' : '') + '>' + esc(x.nama) + '</option>'; }).join('') + '</select></div>' +
+    c = '<div class="fld"><label>Wilayah UPTD tempat kegiatan <i>*</i></label><select class="in" data-f="wilayah"><option value="">Pilih wilayah…</option>' + (S.master.wilayah || []).map(function (x) { return '<option value="' + esc(x.kode) + '"' + (d.wilayah === x.kode ? ' selected' : '') + '>' + esc(x.nama) + (x.cakupan ? ' — ' + esc(x.cakupan) : '') + '</option>'; }).join('') + '</select><p class="hint">Pengajuan ditangani UPTD sesuai wilayah lokasi kegiatan Anda.</p></div>' +
+      '<div class="row2"><div class="fld"><label>Kawasan konservasi <i>*</i></label><select class="in" data-f="kawasan"><option value="">Pilih kawasan…</option>' + S.master.kawasan.map(function (x) { return '<option' + (d.kawasan === x.nama ? ' selected' : '') + '>' + esc(x.nama) + '</option>'; }).join('') + '</select></div>' +
       '<div class="fld"><label>Zona <i>*</i></label><select class="in" data-f="zona"><option value="">Pilih zona…</option>' + zs.map(function (z) { return '<option' + (d.zona === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="fld"><label>Lokasi / area kegiatan <i>*</i></label><input class="in" data-f="lokasi" value="' + f('lokasi') + '"></div><div class="fld"><label>Luas area</label><input class="in" data-f="luas" placeholder="mis. 25 Ha" value="' + f('luas') + '"></div>';
     if (!w.editId) { c += '<div class="fld"><label>Area pengelolaan (opsional)</label><p class="hint">Gambar poligon area yang diusulkan, atau impor Shapefile / GeoJSON / daftar koordinat. Dapat ditambah atau diubah nanti pada tab Peta Area.</p><div id="wizMap"></div></div>'; setTimeout(wizMapInit, 0); }
@@ -33,7 +34,7 @@ function renderWiz() {
       '<div class="callout info">' + mi('attach_file') + '<span>Dokumen persyaratan diunggah pada halaman detail setelah draft disimpan.</span></div>';
   } else {
     const req = (S.master.persyaratan[S.me.jenis_mitra] || []);
-    c = '<dl class="kv"><dt>Judul</dt><dd>' + f('judul') + '</dd><dt>Kawasan / zona</dt><dd>' + f('kawasan') + ' / ' + f('zona') + '</dd><dt>Lokasi</dt><dd>' + f('lokasi') + ' (' + f('luas') + ')</dd><dt>Jangka</dt><dd>' + f('jangka') + '</dd><dt>Anggaran</dt><dd>' + rp(d.biaya) + ' · ' + f('sumber') + '</dd><dt>Uraian</dt><dd>' + f('uraian') + '</dd><dt>Program</dt><dd>' + progReview(d) + '</dd></dl>' +
+    c = '<dl class="kv"><dt>Judul</dt><dd>' + f('judul') + '</dd><dt>Wilayah UPTD</dt><dd>' + esc(wilayahNama(d.wilayah)) + '</dd><dt>Kawasan / zona</dt><dd>' + f('kawasan') + ' / ' + f('zona') + '</dd><dt>Lokasi</dt><dd>' + f('lokasi') + ' (' + f('luas') + ')</dd><dt>Jangka</dt><dd>' + f('jangka') + '</dd><dt>Anggaran</dt><dd>' + rp(d.biaya) + ' · ' + f('sumber') + '</dd><dt>Uraian</dt><dd>' + f('uraian') + '</dd><dt>Program</dt><dd>' + progReview(d) + '</dd></dl>' +
       (req.length && S.me.peran === 'mitra' ? '<h3 style="margin:16px 0 6px">Dokumen yang perlu disiapkan</h3><ul style="padding-left:18px;color:var(--tx-2)">' + req.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' : '');
     if (d.area && d.area.geojson) c += '<p class="t-sub" style="margin-top:10px">Area peta: ' + numID(MapKit.areaHa(MapKit.parse(d.area.geojson))) + ' Ha</p>';
   }
@@ -69,6 +70,7 @@ function wizValidate(st) {
   const d = S.wiz.data;
   if (st === 0 && isSuper() && !d.id_user) return 'Pilih mitra pemilik pengajuan.';
   if (st === 1) { if (!progList(d).length) return 'Pilih minimal satu program Dinas atau tambahkan program sendiri.'; if (progList(d).some(function (x) { return x.jenis === 'mandiri' && !x.nama.trim(); })) return 'Nama program sendiri tidak boleh kosong.'; if (!(d.judul || '').trim() || !(d.uraian || '').trim()) return 'Judul dan uraian program wajib diisi.'; if (words(d.uraian) > 500) return 'Uraian maksimal 500 kata.'; }
+  if (st === 2 && !d.wilayah) return 'Pilih wilayah UPTD tempat kegiatan dilaksanakan.';
   if (st === 2 && (!d.kawasan || !d.zona || !(d.lokasi || '').trim())) return 'Kawasan, zona, dan lokasi wajib diisi.';
   if (st === 3 && d.biaya !== undefined && d.biaya !== '' && Number(d.biaya) < 0) return 'Anggaran tidak boleh negatif.';
   return '';
@@ -81,7 +83,7 @@ function wizSave() {
     bg('Simpan perubahan', function () { d.id = before.id; return api('ubah', d).then(function (r) { replaceP(r); delete S.det[r.id]; }); }, function () { replaceP(before); });
     return;
   }
-  const tmp = { id: 'tmp_' + Date.now(), nomor: 'Menyimpan…', id_user: S.me.id, lembaga: S.me.lembaga, jenis_mitra: S.me.jenis_mitra, judul: d.judul, kawasan: d.kawasan, zona: d.zona, lokasi: d.lokasi, luas: d.luas || '', uraian: d.uraian, biaya: d.biaya, sumber: d.sumber || '', jangka: d.jangka || '', tahap: 1, status: 'Draft', dibuat: now, diubah: now, diubah_oleh: S.me.nama, _pending: true };
+  const tmp = { id: 'tmp_' + Date.now(), nomor: 'Menyimpan…', id_user: S.me.id, lembaga: S.me.lembaga, jenis_mitra: S.me.jenis_mitra, judul: d.judul, wilayah: d.wilayah, kawasan: d.kawasan, zona: d.zona, lokasi: d.lokasi, luas: d.luas || '', uraian: d.uraian, biaya: d.biaya, sumber: d.sumber || '', jangka: d.jangka || '', tahap: 1, status: 'Draft', dibuat: now, diubah: now, diubah_oleh: S.me.nama, _pending: true };
   S.daftar.unshift(tmp); LS.del('sm_form'); S.wiz = null; toast('ok', 'Draft dibuat, sedang disimpan ke server…'); navigateTo('daftar', {}, { replace: true });
   bg('Buat pengajuan', function () {
     return api('buat', d).then(function (p) { S.daftar = S.daftar.filter(function (x) { return x.id !== tmp.id; }); S.daftar.unshift(p); S.peta = null; toast('ok', 'Draft tersimpan: ' + p.nomor); if (S.view === 'daftar') renderList(); else if (S.view === 'dashboard') vDashboard(); renderNav(); });
@@ -103,7 +105,7 @@ function vDetail() {
   renderDetailBody(); const c = S.det[p.id]; if (!c || !c.d || Date.now() - c.t > 20000) loadDetail(p.id);
 }
 function detData() { const c = S.det[S.params.id]; return c && c.d ? c.d : null; }
-function canUploadDoc(p) { if (FINAL.indexOf(p.status) > -1) return false; if (S.me.peran === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi'); return true; }
+function canUploadDoc(p) { if (FINAL.indexOf(p.status) > -1) return false; if (S.me.peran === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi'); return ['admin', 'superadmin'].indexOf(S.me.peran) === -1; }
 function canEditP(p) { return S.me.peran !== 'prl' && S.me.peran !== 'uptd' && S.me.peran !== 'admin' && S.me.peran !== 'kepala_dkp' && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi') && (isSuper() || p.id_user === S.me.id); }
 function tabsFor(p) {
   const t = [['ringkasan', 'Ringkasan'], ['dokumen', 'Dokumen']];
@@ -135,10 +137,12 @@ function tRingkasan(p, d) {
   else if (p.status === 'Perlu dilengkapi') warn = '<div class="callout warn">' + mi('warning') + '<span><b>Perlu dilengkapi.</b> Lihat catatan pada tab Riwayat.</span></div>';
   if (p.status === 'Tidak dilanjutkan') warn = '<div class="callout bad">' + mi('block') + '<span>Pengajuan tidak dilanjutkan.</span></div>';
   if (d && d.jadwal && d.jadwal.status !== 'Dibatalkan' && p.tahap <= 6) warn += '<div class="callout ok" data-act="gotoTab" data-tab="jadwal" style="cursor:pointer">' + mi('event') + '<span><b>Pemaparan dijadwalkan:</b> ' + jadwalTeks(d.jadwal) + '</span></div>';
-  return warn + '<div class="grid g-main"><div class="card"><h3>Data program</h3><p class="sub">Lampiran II</p><dl class="kv"><dt>Lembaga</dt><dd>' + esc(p.lembaga) + '</dd><dt>Jenis mitra</dt><dd>' + esc(jenisNama(p.jenis_mitra)) + '</dd><dt>Kawasan / zona</dt><dd>' + esc(p.kawasan) + ' / ' + esc(p.zona) + '</dd><dt>Lokasi</dt><dd>' + esc(p.lokasi) + ' ' + (p.luas ? '(' + esc(p.luas) + ')' : '') + '</dd><dt>Jangka waktu</dt><dd>' + esc(p.jangka || '-') + '</dd><dt>Anggaran</dt><dd>' + rp(p.biaya) + ' · ' + esc(p.sumber || '-') + '</dd><dt>Uraian</dt><dd style="white-space:pre-wrap">' + esc(p.uraian) + '</dd><dt>Program</dt><dd>' + (d ? progReview({ programs: progFromDet(d.programs) }) : '<span class="t-sub">Memuat…</span>') + '</dd></dl></div>' +
+  return warn + '<div class="grid g-main"><div class="card"><h3>Data program</h3><p class="sub">Lampiran II</p><dl class="kv"><dt>Lembaga</dt><dd>' + esc(p.lembaga) + '</dd><dt>Jenis mitra</dt><dd>' + esc(jenisNama(p.jenis_mitra)) + '</dd><dt>Kawasan / zona</dt><dd>' + esc(p.kawasan) + ' / ' + esc(p.zona) + '</dd><dt>Lokasi</dt><dd>' + esc(p.lokasi) + ' ' + (p.luas ? '(' + esc(p.luas) + ')' : '') + '</dd><dt>Jangka waktu</dt><dd>' + esc(p.jangka || '-') + '</dd><dt>Anggaran</dt><dd>' + rp(p.biaya) + ' · ' + esc(p.sumber || '-') + '</dd><dt>Uraian</dt><dd style="white-space:pre-wrap">' + esc(p.uraian) + '</dd><dt>Wilayah UPTD</dt><dd>' + esc(wilayahNama(p.wilayah)) + '</dd><dt>Program</dt><dd>' + (d ? progReview({ programs: progFromDet(d.programs) }) : '<span class="t-sub">Memuat…</span>') + '</dd></dl></div>' +
     '<div class="card"><h3>Status</h3><p class="sub">Posisi saat ini</p><dl class="kv" style="grid-template-columns:100px 1fr"><dt>Tahap</dt><dd>' + p.tahap + '/12 — ' + esc(stageName(p.tahap)) + '</dd><dt>Status</dt><dd>' + chip(p) + '</dd><dt>Dibuat</dt><dd>' + fmtD(p.dibuat) + '</dd><dt>Diperbarui</dt><dd>' + fmtDT(p.diubah) + '<br><span class="t-sub">oleh ' + esc(p.diubah_oleh) + '</span></dd><dt>Pelaku tahap</dt><dd>' + esc((S.master.stages[p.tahap - 1] || {}).pelaku || '') + '</dd></dl></div></div>';
 }
-function fileChip(b, del) { return '<span class="file">' + mi('description', 'font-size:15px') + '<a href="#" data-act="dl" data-id="' + esc(b.id) + '">' + esc(b.nama) + '</a><span class="t-sub">' + Math.round((b.ukuran || 0) / 1024) + ' KB</span>' + (del ? '<button data-act="delFile" data-id="' + esc(b.id) + '" aria-label="Hapus berkas">' + mi('close', 'font-size:15px') + '</button>' : '') + '</span>'; }
+function wilayahNama(k) { const w = ((S.master && S.master.wilayah) || []).filter(function (x) { return x.kode === k; })[0]; return w ? w.nama : (k || '-'); }
+function bisaLihat(b) { return /\.(pdf|jpe?g|png)$/i.test(b.nama || ''); }
+function fileChip(b, del) { return '<span class="file">' + mi('description', 'font-size:15px') + '<span class="fn">' + esc(b.nama) + '</span><span class="t-sub">' + Math.round((b.ukuran || 0) / 1024) + ' KB</span>' + (bisaLihat(b) ? '<button type="button" class="fbtn" data-act="view" data-id="' + esc(b.id) + '" aria-label="Lihat ' + esc(b.nama) + '">' + mi('visibility', 'font-size:15px') + ' Lihat</button>' : '') + '<button type="button" class="fbtn" data-act="dl" data-id="' + esc(b.id) + '" aria-label="Unduh ' + esc(b.nama) + '">' + mi('download', 'font-size:15px') + ' Unduh</button>' + (del ? '<button data-act="delFile" data-id="' + esc(b.id) + '" aria-label="Hapus berkas">' + mi('close', 'font-size:15px') + '</button>' : '') + '</span>'; }
 function dokItems(p) {
   const per = S.master.persyaratan || {}; let it = per[p.jenis_mitra] || []; let fb = false;
   if (!it.length) { fb = true; const ls = Object.keys(per).map(function (k) { return per[k]; }); it = ls.length ? ls[0].filter(function (x) { return ls.every(function (l) { return l.indexOf(x) > -1; }); }) : []; }

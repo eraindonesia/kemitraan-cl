@@ -248,7 +248,7 @@ const MapKit = (function () {
         poly.bindPopup('<div class="pop"><b>' + esc(a.judul) + '</b><br>' + esc(a.nomor) + ' · ' + esc(a.lembaga) + '<br>' + esc(a.nama) + ' · ' + Number(a.luas_ha || 0).toLocaleString('id-ID') + ' Ha<br><span class="chip ' + statusClass(a) + '">' + esc(a.status) + '</span><br><button class="btn btn-p btn-s" data-pop-open="' + esc(a.id_pengajuan) + '" style="margin-top:6px">Buka pengajuan</button></div>');
       });
       if (katsA.length) setLegend(map, kts.concat(katsA), 'Zona / kategori');
-      const all = L.featureGroup([gB, gA]); const bb = (gB.getLayers().length || gA.getLayers().length) ? all.getBounds() : null; if (bb && bb.isValid()) map.fitBounds(bb.pad(0.15), { maxZoom: 13 });
+      const all = L.featureGroup([gB, gA]); const bb = (o.fitAreas && gA.getLayers().length) ? gA.getBounds() : ((gB.getLayers().length || gA.getLayers().length) ? all.getBounds() : null); if (bb && bb.isValid()) map.fitBounds(bb.pad(o.fitAreas ? 0.3 : 0.15), { maxZoom: o.fitAreas ? 16 : 13 });
     }
     map.on('popupopen', function (e) { const b = e.popup.getElement().querySelector('[data-pop-open]'); if (b) b.onclick = function () { map.closePopup(); if (o.onOpen) o.onOpen(b.dataset.popOpen); }; });
     if (o.onClick) map.on('click', function (e) { o.onClick(e.latlng.lat, e.latlng.lng); });
