@@ -182,7 +182,7 @@ const MapKit = (function () {
     const fg = L.featureGroup(); const gr = groupsOf(g); const big = map && countVert(g) > 15000; const rend = big ? (map._cv = map._cv || L.canvas({ padding: 0.3 })) : null;
     if (gr.some(function (x) { return x.kat; })) {
       gr.forEach(function (x) { const c = katWarna(x.kat); const geom = x.polys.length === 1 ? { type: 'Polygon', coordinates: x.polys[0] } : { type: 'MultiPolygon', coordinates: x.polys };
-        L.polygon(latlngs(geom), { color: c, weight: big ? 1 : 2, fillColor: c, fillOpacity: 0.38, smoothFactor: big ? 1.5 : 1, renderer: rend || undefined }).bindTooltip((label ? esc(label) + ' · ' : '') + '<b>' + esc(x.kat || 'Lainnya') + '</b> · ' + numHa(areaHa(geom)) + ' Ha', { sticky: true }).addTo(fg); });
+        L.polygon(latlngs(geom), { color: c, weight: big ? 1 : 2, fillColor: c, fillOpacity: 0.38, smoothFactor: big ? 1.5 : 1, renderer: rend || undefined }).bindTooltip((label ? esc(label) + ' · ' : '') + '<b>' + esc(x.kat || 'Lainnya') + '</b>', { sticky: true }).addTo(fg); });
     } else L.polygon(latlngs(g), base).addTo(fg);
     return fg;
   }

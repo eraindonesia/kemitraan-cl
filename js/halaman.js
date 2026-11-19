@@ -11,7 +11,7 @@ const PHASES = [
   { t1: 1, t2: 3, nama: 'Permohonan & Verifikasi' }, { t1: 4, t2: 5, nama: 'Telaah Ruang & RPZ' }, { t1: 6, t2: 8, nama: 'Pemaparan & BA Sepakat' },
   { t1: 9, t2: 11, nama: 'Draft PKS & Tanda Tangan' }, { t1: 12, t2: 12, nama: 'Monev & Pelaksanaan' }
 ];
-const CTA = { 1: 'Lengkapi', 2: 'Disposisi', 3: 'Verifikasi', 4: 'Telaah ruang', 5: 'Telaah program', 6: 'Pemaparan', 7: 'Penelaahan', 8: 'Kesepakatan', 9: 'Susun PKS', 10: 'Lapor Gubernur', 11: 'Tanda tangan', 12: 'Monev' };
+const CTA = { 1: 'Lengkapi', 2: 'Disposisi', 3: 'Verifikasi', 4: 'Telaah ruang', 5: 'Telaah program', 6: 'Pemaparan', 7: 'Penelaahan', 8: 'Kesepakatan', 9: 'Susun PKS', 10: 'Lapor ke DKP', 11: 'Tanda tangan', 12: 'Monev' };
 const DONUT = ['#0B2A4A', '#2f7de1', '#39c5c9', '#0e8f94', '#9db6cf'];
 
 /* ----------------------------- util ----------------------------- */
@@ -68,9 +68,8 @@ function vDashboard() {
     '<button class="kpi2" data-act="goDaftar" data-p=\'{"tahap":"12"}\'><div class="lb"><span>Realisasi monev</span><span class="ic" style="background:var(--green-l);color:var(--green-d)">' + mi('task_alt') + '</span></div><div class="vl">' + (avg === null ? '—' : avg.toFixed(1) + '%') + '</div><div class="ft"><span>Target RPB: 100%</span>' + (avg === null ? '' : '<span class="tag ' + (avg >= 80 ? 'tg-up' : 'tg-w') + '">' + (avg >= 80 ? 'On-Track' : 'Perlu dikejar') + '</span>') + '</div></button></div>';
   const phases = '<div class="phases">' + PHASES.map(function (ph, i) {
     const items = D.filter(function (p) { return act(p) && p.tahap >= ph.t1 && p.tahap <= ph.t2; }).sort(function (a, b) { return a.diubah < b.diubah ? 1 : -1; });
-    const sum = items.reduce(function (a, p) { return a + (Number(p.biaya) || 0); }, 0);
-    return '<div class="ph-col"><button class="ph-head ph-' + i + '" data-act="goDaftar" data-p=\'' + esc(JSON.stringify({ t1: ph.t1, t2: ph.t2 })) + '\'><div class="r1"><span>TAHAP ' + (ph.t1 === ph.t2 ? ph.t1 : ph.t1 + ' – ' + ph.t2) + '</span><span>' + items.length + ' Usulan</span></div><b>' + esc(ph.nama) + '</b><small>' + rpBig(sum) + '</small></button>' +
-      items.slice(0, 3).map(function (p) { return '<button class="mini" data-act="open" data-id="' + esc(p.id) + '"><div class="t"><i>' + esc(initials(p.lembaga)) + '</i><span>' + esc(p.lembaga) + '</span></div><div class="m"><span>' + esc(p.kawasan) + '</span><b>' + rpBig(p.biaya) + '</b></div></button>'; }).join('') +
+    return '<div class="ph-col"><button class="ph-head ph-' + i + '" data-act="goDaftar" data-p=\'' + esc(JSON.stringify({ t1: ph.t1, t2: ph.t2 })) + '\'><div class="r1"><span>TAHAP ' + (ph.t1 === ph.t2 ? ph.t1 : ph.t1 + ' – ' + ph.t2) + '</span><span>' + items.length + ' Usulan</span></div><b>' + esc(ph.nama) + '</b></button>' +
+      items.slice(0, 3).map(function (p) { return '<button class="mini" data-act="open" data-id="' + esc(p.id) + '"><div class="t"><i>' + esc(initials(p.lembaga)) + '</i><span>' + esc(p.lembaga) + '</span></div><div class="m"><span>' + esc(p.kawasan) + '</span></div></button>'; }).join('') +
       (items.length > 3 ? '<div class="more">+' + (items.length - 3) + ' usulan lainnya</div>' : (items.length ? '' : '<div class="more" style="padding:14px 0">Belum ada usulan</div>')) + '</div>';
   }).join('') + '</div>';
   // sebaran jenis mitra
@@ -81,7 +80,17 @@ function vDashboard() {
   // sebaran kawasan
   const kw = {}; D.forEach(function (p) { kw[p.kawasan] = (kw[p.kawasan] || 0) + 1; }); const kk = Object.keys(kw).sort(function (a, b) { return kw[b] - kw[a]; }); const mx = Math.max(1, kw[kk[0]] || 1);
   const kbars = kk.length ? kk.map(function (k) { return '<div class="brow"><span title="' + esc(k) + '">' + esc(k) + '</span><div class="bt"><i style="width:' + (kw[k] / mx * 100) + '%"></i></div><b>' + kw[k] + '</b></div>'; }).join('') : '<div class="empty">' + mi('bar_chart') + 'Belum ada data kawasan.</div>';
-  const luas = S.peta ? S.peta.areas.filter(function (a) { return ids[a.id_pengajuan]; }).reduce(function (s, a) { return s + (Number(a.luas_ha) || 0); }, 0) : null;
+  // ringkasan anggaran (terpisah dari kartu tahapan)
+  const sumB2 = function (l) { return l.reduce(function (a, p) { return a + (Number(p.biaya) || 0); }, 0); };
+  const totA = sumB2(D); const nA = D.filter(function (p) { return Number(p.biaya) > 0; }).length;
+  const perFase = PHASES.map(function (ph) { const it = D.filter(function (p) { return act(p) && p.tahap >= ph.t1 && p.tahap <= ph.t2; }); return { nm: ph.nama, v: sumB2(it), n: it.length }; });
+  const mxF = Math.max(1, Math.max.apply(null, perFase.map(function (x) { return x.v; })));
+  const perKaw = {}; D.forEach(function (p) { perKaw[p.kawasan] = (perKaw[p.kawasan] || 0) + (Number(p.biaya) || 0); });
+  const kawA = Object.keys(perKaw).sort(function (a, b) { return perKaw[b] - perKaw[a]; }).slice(0, 5); const mxK = Math.max(1, perKaw[kawA[0]] || 1);
+  const anggaran = '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('payments') + '</div><div><h3>Ringkasan anggaran</h3><p class="sub">Rencana anggaran seluruh usulan pada filter ini.</p></div></div>' +
+    '<div class="angg-grid"><div class="kpi-a"><small>Total rencana anggaran</small><b>' + rpBig(totA) + '</b></div><div class="kpi-a"><small>Usulan beranggaran</small><b>' + nA + ' / ' + D.length + '</b></div><div class="kpi-a"><small>Rata-rata per usulan</small><b>' + rpBig(nA ? totA / nA : 0) + '</b></div></div>' +
+    '<div class="grid g2" style="margin-top:16px"><div class="bars"><h4 style="margin-bottom:8px">Per fase tahapan</h4>' + perFase.map(function (x) { return '<div class="brow"><span title="' + esc(x.nm) + '">' + esc(x.nm) + '</span><div class="bt"><i style="width:' + (x.v / mxF * 100) + '%"></i></div><b>' + rpBig(x.v) + '</b></div>'; }).join('') + '</div>' +
+    '<div class="bars"><h4 style="margin-bottom:8px">Per kawasan (5 teratas)</h4>' + (kawA.length ? kawA.map(function (k) { return '<div class="brow"><span title="' + esc(k) + '">' + esc(k) + '</span><div class="bt"><i style="width:' + (perKaw[k] / mxK * 100) + '%"></i></div><b>' + rpBig(perKaw[k]) + '</b></div>'; }).join('') : '<div class="empty">Belum ada data.</div>') + '</div></div></div>';
   // perlu tindakan
   const need = D.filter(needsAction).sort(function (a, b) { return a.diubah > b.diubah ? 1 : -1; });
   const nlist = need.slice(0, 4).map(function (p) { return '<button class="act" data-act="open" data-id="' + esc(p.id) + '"><div class="r"><span>' + mi('schedule', 'font-size:14px') + ' Menunggu ' + waitTxt(p.diubah) + '</span><span class="tag tg-b">Tahap ' + p.tahap + '</span></div><div class="tt"><span>' + esc(p.lembaga) + '</span><span class="cta">' + esc(CTA[p.tahap] || 'Buka') + '</span></div><p>' + esc(stageName(p.tahap)) + ' — ' + esc(p.judul) + '</p><div class="r" style="margin-top:4px"><span>' + esc(p.kawasan) + '</span><span>' + esc(p.nomor) + '</span></div></button>'; }).join('') || '<div class="empty">' + mi('task_alt') + 'Tidak ada tindakan tertunda.</div>';
@@ -98,9 +107,9 @@ function vDashboard() {
     '<label class="sel">' + mi('date_range', 'font-size:16px') + '<select data-chg="dashFilter" data-k="periode" aria-label="Periode">' + per.map(function (x) { return '<option value="' + x[0] + '"' + (S.dash.periode === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
     '<label class="sel">' + mi('tune', 'font-size:16px') + '<select data-chg="dashFilter" data-k="kawasan" aria-label="Kawasan"><option value="">Semua kawasan (' + S.master.kawasan.length + ')</option>' + S.master.kawasan.map(function (k) { return '<option' + (S.dash.kawasan === k.nama ? ' selected' : '') + ' value="' + esc(k.nama) + '">' + esc(k.nama) + '</option>'; }).join('') + '</select></label>' +
     '<button class="btn btn-p" data-act="exportRekap">' + mi('download') + ' Ekspor rekap</button></div></div>' + onboard + kpis +
-    '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('account_tree') + '</div><div><h3>Alur 12 tahapan kemitraan konservasi</h3><p class="sub">Distribusi berkas permohonan kemitraan per fase tindak lanjut.</p></div><div class="sp"></div><a class="lnk" data-act="goDaftar" data-p="{}">Lihat seluruh pipeline ›</a></div>' + phases + '</div>' +
+    '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('account_tree') + '</div><div><h3>Alur 12 tahapan kemitraan konservasi</h3><p class="sub">Distribusi berkas permohonan kemitraan per fase tindak lanjut.</p></div><div class="sp"></div><a class="lnk" data-act="goDaftar" data-p="{}">Lihat seluruh pipeline ›</a></div>' + phases + '</div>' + anggaran +
     '<div class="g3x"><div class="card"><h3>Sebaran jenis calon mitra</h3><p class="sub">Komposisi pemohon aktif</p><div class="donut">' + donutSvg(jparts, D.length) + '<ul class="leg" style="flex:1;min-width:150px">' + jleg + '</ul></div></div>' +
-    '<div class="card bars"><h3>Sebaran kawasan konservasi</h3><p class="sub">Jumlah usulan per kawasan</p>' + kbars + '<p class="sub" style="margin:12px 0 0">Total luas area diusulkan: <b id="dashLuas">' + (luas === null ? '…' : numID(luas) + ' Ha') + '</b></p></div>' +
+    '<div class="card bars"><h3>Sebaran kawasan konservasi</h3><p class="sub">Jumlah usulan per kawasan</p>' + kbars + '</div>' +
     '<div class="card gauge"><h3 style="text-align:left">Capaian target monev</h3><p class="sub" style="text-align:left">Rata-rata ' + mon.length + ' laporan monitoring</p>' + gauge(avg === null ? 0 : avg) + '<div class="gstats"><div><small>Target</small><b>100%</b></div><div class="hl"><small>Terealisasi</small><b>' + (avg === null ? '—' : avg.toFixed(1) + '%') + '</b></div><div><small>Selisih</small><b>' + (avg === null ? '—' : (100 - avg).toFixed(1) + '%') + '</b></div></div></div></div>' +
     '<div class="g-map"><div class="card"><div class="card-h"><div><h3>Peta zonasi kemitraan aktif</h3><p class="sub">Batas kawasan (garis putus-putus) dan area pengelolaan usulan.</p></div><div class="sp"></div><a class="lnk" data-act="goPeta">Buka peta penuh ›</a></div><div class="mapbox mid" id="dashMap"></div><div class="map-legend" id="dashLeg"></div></div>' +
     '<div class="card"><div class="card-h"><div class="ic" style="background:var(--coral-l);color:var(--coral)">' + mi('notifications_active') + '</div><div><h3>Perlu tindakan</h3></div><div class="sp"></div><span class="tag tg-w">' + need.length + ' prioritas</span></div>' + nlist + (need.length ? '<button class="btn btn-o btn-block btn-s" data-act="goDaftar" data-p=\'{"aksi":1}\'>Lihat semua (' + need.length + ')</button>' : '') + '</div></div>' +
@@ -110,7 +119,7 @@ function vDashboard() {
   const draw = function () {
     const pt = S.peta; if (!pt) return; const ar = pt.areas.filter(function (a) { return ids[a.id_pengajuan]; });
     const bt = pt.batas.filter(function (b) { return !S.dash.kawasan || b.kawasan === S.dash.kawasan; });
-    if (!S._dm) return; S._dm.update(bt, ar); const l = $('dashLuas'); if (l) l.textContent = numID(ar.reduce(function (s, a) { return s + (Number(a.luas_ha) || 0); }, 0)) + ' Ha';
+    if (!S._dm) return; S._dm.update(bt, ar);
     const lg = $('dashLeg'); if (lg) lg.innerHTML = (pt.batas.length || ar.length) ? petaLegend() : '<span>Belum ada area/batas yang diunggah.</span>';
   };
   S._dm = MapKit.overview($('dashMap'), { scroll: false, onOpen: function (id) { navigateTo('detail', { id: id }); } });
@@ -131,8 +140,8 @@ function vDokumen() {
     $('dkBody').innerHTML = rows.length ? '<div class="grid g2">' + rows.map(function (x) {
       return '<div class="card"><div class="card-h" style="margin-bottom:6px"><div class="ic" style="background:' + (x._ok ? 'var(--green-l);color:var(--green-d)' : 'var(--bg);color:var(--tx-2)') + '">' + mi(x._k === 'pks' ? 'handshake' : 'description') + '</div><div style="min-width:0"><h3 style="font-size:14px">' + esc(x._t) + '</h3><p class="sub">' + esc(x.nomor || '(belum bernomor)') + '</p></div><div class="sp"></div><span class="chip ' + (x._ok ? 'c-ok' : 'c-draft') + '">' + esc(x._st) + '</span></div>' +
         '<p class="t-b">' + esc(x.judul) + '</p><p class="t-sub">' + esc(x.nomor_pengajuan) + ' · ' + esc(x.lembaga) + ' · ' + esc(x.kawasan) + '</p>' +
-        (x._ok ? '<p class="t-sub" style="margin-top:8px">Kode verifikasi:</p><div class="codebox">' + esc(x.kode) + '</div>' : '') +
-        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-o btn-s" data-act="openTab" data-id="' + esc(x.id_pengajuan) + '" data-tab="ba">' + mi('open_in_new', 'font-size:16px') + ' Buka pengajuan</button>' + (x._ok ? '<button class="btn btn-o btn-s" data-act="copyKode" data-k="' + esc(x.kode) + '">' + mi('content_copy', 'font-size:16px') + ' Salin kode</button>' : '') + '</div></div>';
+        (x._ok && x.kode ? '<p class="t-sub" style="margin-top:8px">Kode verifikasi:</p><div class="codebox">' + esc(x.kode) + '</div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-o btn-s" data-act="openTab" data-id="' + esc(x.id_pengajuan) + '" data-tab="ba">' + mi('open_in_new', 'font-size:16px') + ' Buka pengajuan</button>' + (x._ok && x.kode ? '<button class="btn btn-o btn-s" data-act="copyKode" data-k="' + esc(x.kode) + '">' + mi('content_copy', 'font-size:16px') + ' Salin kode</button>' : '') + '</div></div>';
     }).join('') + '</div>' : '<div class="card empty">' + mi('description') + 'Belum ada dokumen.</div>';
   };
   S._dokDraw = draw; if (S.dok) draw();
@@ -153,7 +162,7 @@ function vStatistik() {
   const jn = {}; D.forEach(function (p) { jn[p.jenis_mitra] = (jn[p.jenis_mitra] || 0) + 1; });
   const jRows = Object.keys(jn).sort(function (a, b) { return jn[b] - jn[a]; }).map(function (k) { return '<tr style="cursor:default"><td>' + esc(jenisNama(k)) + '</td><td>' + jn[k] + '</td></tr>'; }).join('') || '<tr><td colspan="2" class="t-sub">Belum ada data.</td></tr>';
   const kwRows = function () {
-    return S.master.kawasan.map(function (k) { const it = D.filter(function (p) { return p.kawasan === k.nama; }); const ids = {}; it.forEach(function (p) { ids[p.id] = 1; }); const lu = S.peta ? S.peta.areas.filter(function (a) { return ids[a.id_pengajuan]; }).reduce(function (s, a) { return s + (Number(a.luas_ha) || 0); }, 0) : null; return '<tr style="cursor:default"><td>' + esc(k.nama) + '</td><td>' + it.length + '</td><td>' + rpBig(sumB(it)) + '</td><td>' + (lu === null ? '…' : numID(lu) + ' Ha') + '</td></tr>'; }).join('');
+    return S.master.kawasan.map(function (k) { const it = D.filter(function (p) { return p.kawasan === k.nama; }); const ids = {}; it.forEach(function (p) { ids[p.id] = 1; }); return '<tr style="cursor:default"><td>' + esc(k.nama) + '</td><td>' + it.length + '</td><td>' + rpBig(sumB(it)) + '</td></tr>'; }).join('');
   };
   const avg = S.monev.length ? S.monev.reduce(function (a, m) { return a + Number(m.capaian_persen || 0); }, 0) / S.monev.length : null;
   setView('<div class="ph"><div><h2>Laporan & statistik</h2><p>Ringkasan seluruh pengajuan yang dapat Anda akses.</p></div><div class="sp"></div><button class="btn btn-o" data-act="exportRekap">' + mi('download') + ' Ekspor rekap pengajuan (CSV)</button><button class="btn btn-o" data-act="exportMonev">' + mi('download') + ' Ekspor monev (CSV)</button></div>' +
@@ -161,13 +170,13 @@ function vStatistik() {
     '<div class="card" style="margin-bottom:16px"><h3>Pengajuan dibuat per bulan</h3><p class="sub">12 bulan terakhir</p>' + chart + '</div>' +
     '<div class="grid g2" style="margin-bottom:16px"><div class="card"><h3>Per fase</h3><div class="tbl-wrap" style="display:block;margin-top:8px"><table style="min-width:0"><thead><tr><th>Fase</th><th>Usulan</th><th>Anggaran</th></tr></thead><tbody>' + faseRows + '</tbody></table></div></div>' +
     '<div class="card"><h3>Per jenis mitra</h3><div class="tbl-wrap" style="display:block;margin-top:8px"><table style="min-width:0"><thead><tr><th>Jenis</th><th>Usulan</th></tr></thead><tbody>' + jRows + '</tbody></table></div></div></div>' +
-    '<div class="card"><h3>Per kawasan konservasi</h3><div class="tbl-wrap" style="display:block;margin-top:8px"><table style="min-width:0"><thead><tr><th>Kawasan</th><th>Usulan</th><th>Anggaran</th><th>Luas area diusulkan</th></tr></thead><tbody id="kwRows">' + kwRows() + '</tbody></table></div></div>');
+    '<div class="card"><h3>Per kawasan konservasi</h3><div class="tbl-wrap" style="display:block;margin-top:8px"><table style="min-width:0"><thead><tr><th>Kawasan</th><th>Usulan</th><th>Anggaran</th></tr></thead><tbody id="kwRows">' + kwRows() + '</tbody></table></div></div>');
   loadPeta().then(function () { const e = $('kwRows'); if (e && S.view === 'statistik') e.innerHTML = kwRows(); }).catch(function () {});
 }
 function exportRekap() {
   const D = (S.view === 'dashboard' ? dashData() : S.daftar).filter(function (p) { return !p._pending; });
-  const head = ['Nomor', 'Judul', 'Lembaga', 'Jenis mitra', 'Kawasan', 'Zona', 'Lokasi', 'Luas (teks)', 'Anggaran (Rp)', 'Sumber pembiayaan', 'Jangka waktu', 'Tahap', 'Nama tahap', 'Status', 'Dibuat', 'Diperbarui'];
-  downloadCSV('rekap-pengajuan-' + today() + '.csv', [head].concat(D.map(function (p) { return [p.nomor, p.judul, p.lembaga, jenisNama(p.jenis_mitra), p.kawasan, p.zona, p.lokasi, p.luas, p.biaya, p.sumber, p.jangka, p.tahap, stageName(p.tahap), p.status, p.dibuat, p.diubah]; })));
+  const head = ['Nomor', 'Judul', 'Lembaga', 'Jenis mitra', 'Kawasan', 'Zona', 'Lokasi', 'Anggaran (Rp)', 'Sumber pembiayaan', 'Jangka waktu', 'Tahap', 'Nama tahap', 'Status', 'Dibuat', 'Diperbarui'];
+  downloadCSV('rekap-pengajuan-' + today() + '.csv', [head].concat(D.map(function (p) { return [p.nomor, p.judul, p.lembaga, jenisNama(p.jenis_mitra), p.kawasan, p.zona, p.lokasi, p.biaya, p.sumber, p.jangka, p.tahap, stageName(p.tahap), p.status, p.dibuat, p.diubah]; })));
   toast('ok', 'Rekap diekspor (' + D.length + ' baris).');
 }
 function exportMonev() {
@@ -177,7 +186,7 @@ function exportMonev() {
 
 /* ----------------------------- Peta Kawasan ----------------------------- */
 function vPeta() {
-  setTitle('Peta Kawasan'); const adm = S.me.peran === 'admin';
+  setTitle('Peta Kawasan'); const adm = isSuper();
   setView('<div class="ph"><div><h2>Peta kawasan & area pengelolaan</h2><p>Batas kawasan konservasi dan area pengelolaan yang diusulkan mitra.</p></div><div class="sp"></div>' + (adm ? '<button class="btn btn-o" data-act="nav2" data-v="master">' + mi('edit_location_alt') + ' Kelola batas kawasan</button>' : '') + '</div>' +
     '<div class="map-layout"><div class="card"><div class="mapbox tall" id="petaMap"></div><div class="map-legend">' + petaLegend() + '</div><p class="hint" id="petaEmpty" style="margin-top:6px"></p></div>' +
     '<div><div class="card" style="margin-bottom:16px"><h3>Saring peta</h3><div class="fld" style="margin-top:10px"><label>Kawasan</label><select class="in" data-chg="petaFilter" data-k="kawasan"><option value="">Semua kawasan</option>' + S.master.kawasan.map(function (k) { return '<option' + (S.petaF.kawasan === k.nama ? ' selected' : '') + ' value="' + esc(k.nama) + '">' + esc(k.nama) + '</option>'; }).join('') + '</select></div>' +
@@ -198,8 +207,7 @@ function vPeta() {
     const pt = S.peta; if (!pt || !S._pm || S.view !== 'peta') return; const f = S.petaF;
     const ar = pt.areas.filter(function (a) { return (!f.kawasan || a.kawasan === f.kawasan) && (!f.grup || groupOf(a) === f.grup); });
     const bt = pt.batas.filter(function (b) { return !f.kawasan || b.kawasan === f.kawasan; });
-    S._pm.update(bt, ar); const tot = ar.reduce(function (s, a) { return s + (Number(a.luas_ha) || 0); }, 0);
-    $('petaSum').innerHTML = '<b>' + ar.length + '</b> area · <b>' + numID(tot) + ' Ha</b> · ' + bt.length + ' batas kawasan';
+    S._pm.update(bt, ar); $('petaSum').innerHTML = '<b>' + ar.length + '</b> area · ' + bt.length + ' batas kawasan';
     $('petaEmpty').textContent = (!pt.areas.length && !pt.batas.length) ? 'Belum ada area atau batas yang diunggah. Mitra menggambar area pada pengajuannya; Admin mengunggah batas di Data Master & Batas.' : '';
   };
   S._pdraw = draw;
@@ -226,19 +234,18 @@ function openBantuan() {
 /* ----------------------------- Tab Peta pada detail ----------------------------- */
 function canEditAreaP(p) {
   if (FINAL.indexOf(p.status) > -1) return false; const r = S.me.peran;
-  if (r === 'admin') return true; if (r === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi');
+  if (r === 'superadmin') return true; if (r === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi');
   return (r === 'prl' || r === 'uptd') && p.tahap <= 5;
 }
 function tPeta(p, d) {
   const edit = canEditAreaP(p); const areas = d.areas || []; const batas = S.peta ? S.peta.batas : [];
   const items = areas.map(function (a) {
     const c = MapKit.cek(MapKit.parse(a.geojson), p.kawasan, batas); const cls = { dalam: 'c-ok', sebagian: 'c-warn', luar: 'c-bad', tanpa_batas: 'c-draft' }[c.status]; const lb = { dalam: 'Di dalam kawasan', sebagian: 'Sebagian di luar', luar: 'Di luar kawasan', tanpa_batas: 'Batas belum ada' }[c.status];
-    return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(a.nama) + '</div><div class="t-sub">' + numID(a.luas_ha) + ' Ha · oleh ' + esc(a.pembuat) + ' · ' + fmtD(a.diubah) + '</div><span class="chip ' + cls + '" style="margin-top:4px" title="' + esc(c.teks) + '">' + lb + '</span></div>' +
+    return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(a.nama) + '</div><div class="t-sub">' + 'oleh ' + esc(a.pembuat) + ' · ' + fmtD(a.diubah) + '</div><span class="chip ' + cls + '" style="margin-top:4px" title="' + esc(c.teks) + '">' + lb + '</span></div>' +
       (edit ? '<div style="display:flex;gap:6px"><button class="btn btn-o btn-s" data-act="areaEdit" data-id="' + esc(a.id) + '">' + mi('edit', 'font-size:16px') + '</button><button class="btn btn-o btn-s" data-act="areaDel" data-id="' + esc(a.id) + '" aria-label="Hapus area">' + mi('delete', 'font-size:16px') + '</button></div>' : '') + '</div>';
   }).join('') || '<div class="empty" style="padding:22px">' + mi('location_off') + 'Belum ada area pengelolaan.</div>';
-  const tot = areas.reduce(function (s, a) { return s + (Number(a.luas_ha) || 0); }, 0);
   return '<div class="grid g-main"><div class="card"><h3>Peta area pengelolaan</h3><p class="sub">Area diusulkan di ' + esc(p.kawasan) + ' (garis putus-putus = batas kawasan).</p><div class="mapbox" id="detMap"></div></div>' +
-    '<div class="card"><h3>Daftar area</h3><p class="sub">' + areas.length + ' area · ' + numID(tot) + ' Ha</p>' + items + (edit ? '<button class="btn btn-p btn-block" style="margin-top:12px" data-act="areaAdd">' + mi('add_location_alt') + ' Tambah area</button>' : '') + '</div></div>';
+    '<div class="card"><h3>Daftar area</h3><p class="sub">' + areas.length + ' area</p>' + items + (edit ? '<button class="btn btn-p btn-block" style="margin-top:12px" data-act="areaAdd">' + mi('add_location_alt') + ' Tambah area</button>' : '') + '</div></div>';
 }
 function afterDetailRender() {
   if (S.view !== 'detail' || S.tab !== 'peta') return; const p = pById(S.params.id), d = detData(), el = $('detMap'); if (!p || !d || !el) return;
@@ -289,7 +296,7 @@ function batasCardHtml() {
 }
 function fillBatas() {
   const el = $('batasList'); if (!el) return;
-  const draw = function () { if (!$('batasList')) return; $('batasList').innerHTML = S.master.kawasan.map(function (k) { const b = S.peta.batas.filter(function (x) { return x.kawasan === k.nama; })[0]; return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(k.nama) + '</div><div class="t-sub">' + (b ? 'Batas terunggah · ' + numID(b.luas_ha) + ' Ha' : 'Belum ada batas') + '</div></div><div style="display:flex;gap:6px"><button class="btn btn-o btn-s" data-act="batasEdit" data-k="' + esc(k.nama) + '">' + mi('edit_location_alt', 'font-size:16px') + ' ' + (b ? 'Ubah' : 'Atur') + '</button>' + (b ? '<button class="btn btn-o btn-s" data-act="batasDel" data-k="' + esc(k.nama) + '" aria-label="Hapus batas">' + mi('delete', 'font-size:16px') + '</button>' : '') + '</div></div>'; }).join(''); };
+  const draw = function () { if (!$('batasList')) return; $('batasList').innerHTML = S.master.kawasan.map(function (k) { const b = S.peta.batas.filter(function (x) { return x.kawasan === k.nama; })[0]; return '<div class="ck" style="grid-template-columns:1fr auto"><div><div class="nm">' + esc(k.nama) + '</div><div class="t-sub">' + (b ? 'Batas terunggah' : 'Belum ada batas') + '</div></div><div style="display:flex;gap:6px"><button class="btn btn-o btn-s" data-act="batasEdit" data-k="' + esc(k.nama) + '">' + mi('edit_location_alt', 'font-size:16px') + ' ' + (b ? 'Ubah' : 'Atur') + '</button>' + (b ? '<button class="btn btn-o btn-s" data-act="batasDel" data-k="' + esc(k.nama) + '" aria-label="Hapus batas">' + mi('delete', 'font-size:16px') + '</button>' : '') + '</div></div>'; }).join(''); };
   loadPeta(true).then(function () { draw(); fillWarna(); }).catch(function (e) { el.innerHTML = '<div class="callout bad">' + mi('error') + '<span>' + esc(e.message) + '</span></div>'; });
 }
 function openBatasModal(kaw) {

@@ -4,6 +4,9 @@ function precheckMaju(p, t) {
   const d = detData(); if (!d) return '';
   if (t.k.indexOf('Kirim') === 0) { const ms = dokMissing(p, d); if (ms.length) { S.tab = 'dokumen'; S.dokSel = { id: p.id, i: Math.max(0, dokItems(p).items.indexOf(ms[0])) }; return 'Dokumen persyaratan belum lengkap (' + ms.length + ' belum diunggah): ' + ms.slice(0, 2).join('; ') + (ms.length > 2 ? ', dst.' : '') + '.'; } }
   if (t.k === 'Pemaparan Selesai' && !(d.jadwal && d.jadwal.status !== 'Dibatalkan')) { S.tab = 'jadwal'; return 'Tentukan jadwal pemaparan terlebih dahulu (tab Jadwal Pemaparan).'; }
+  const wajibTtd = { 'Pemaparan Selesai': 'BA Pemaparan', 'Disepakati': 'BA Hasil Penelaahan', 'PKS Ditandatangani': 'PKS Bertanda Tangan' }[t.k];
+  if (wajibTtd && !ttdBerkas(d, wajibTtd)) { S.tab = 'ba'; return 'Unggah ' + wajibTtd + ' (hasil pindai bertanda tangan) terlebih dahulu pada tab Berita Acara & PKS.'; }
+  if (t.k.indexOf('Kirim') === 0 && !(d.programs && d.programs.length)) { return 'Pilih minimal satu program (program Dinas atau program sendiri) lewat tombol Ubah pengajuan.'; }
   if (t.k === 'Lengkap') { const items = S.master.persyaratan[p.jenis_mitra] || []; const ok = items.every(function (i) { return d.checklist.some(function (c) { return c.item === i && c.status === 'Sesuai'; }); }); if (!ok) { S.tab = 'checklist'; return 'Checklist (Lampiran III) belum seluruhnya "Sesuai". Simpan checklist lengkap terlebih dahulu.'; } }
   return '';
 }
@@ -65,16 +68,18 @@ function saveMonev() {
   bg('Kirim monev', function () { return api('monev_simpan', v).then(function (r) { Object.assign(row, r); }); }, function () { d.monev = d.monev.filter(function (x) { return x !== row; }); S.monev = S.monev.filter(function (x) { return x !== row; }); renderDetailBody(); });
 }
 function reloadDetailSoon(id) { delete S.det[id]; if (S.view === 'detail' && S.params.id === id) loadDetail(id, true); }
-function saveBA(btn, j) {
-  const p = curP(); const g = function (k) { const e = document.querySelector('[data-ba="' + j + '"][data-k="' + k + '"]'); return e ? e.value : ''; };
-  loadingBtn(btn, true); api('ba_simpan', { id: p.id, jenis: j, tanggal: g('tanggal'), peserta: g('peserta'), kesimpulan: g('kesimpulan') }).then(function () { toast('ok', 'Berita acara disimpan.'); S.dirty = false; reloadDetailSoon(p.id); }).catch(function (e) { toast('bad', e.message); loadingBtn(btn, false); });
-}
-function sahkanBA(id) {
-  modal({ title: 'Sahkan Berita Acara', sub: 'Setelah disahkan, isi dikunci.', body: approverField('shPw'), ok: 'Sahkan', onOk: function () {
-    const pw = $('shPw').value; if (!pw) { $('mErr').textContent = approverMsg(); return false; }
-    return api('ba_sahkan', { id_ba: id, password: pw }).then(function () { toast('ok', 'Berita acara disahkan.'); reloadDetailSoon(S.params.id); });
-  } });
-  approverInit('shPw');
+function ttdUpload(btn, jenis) {
+  const p = curP(); const id = 'tt' + jenis.replace(/\W/g, ''); const g = function (k) { const e = $(id + k); return e ? e.value : ''; };
+  const fi = $(id + 'F'); const f = fi && fi.files && fi.files[0]; if (!f) { toast('bad', 'Pilih berkas hasil pindai terlebih dahulu.'); return; }
+  const ext = f.name.split('.').pop().toLowerCase(); if (['pdf', 'jpg', 'jpeg', 'png'].indexOf(ext) === -1) { toast('bad', 'Gunakan PDF, JPG, atau PNG.'); return; }
+  if (f.size > 8 * 1024 * 1024) { toast('bad', 'Ukuran berkas melebihi 8 MB.'); return; }
+  const slot = TTD_SLOTS.filter(function (x) { return x.jenis === jenis; })[0]; if (slot && slot.tgl && !g('T')) { toast('bad', 'Tanggal penandatanganan wajib diisi.'); return; }
+  loadingBtn(btn, true); const rd = new FileReader();
+  rd.onload = function () {
+    api('ttd_unggah', { id: p.id, jenis: jenis, tanggal: g('T'), nomor_dok: g('N'), catatan: g('C'), nama: f.name, base64: String(rd.result).split(',')[1] })
+      .then(function () { toast('ok', jenis + ' terunggah.'); reloadDetailSoon(p.id); }).catch(function (e) { toast('bad', e.message); loadingBtn(btn, false); });
+  };
+  rd.onerror = function () { toast('bad', 'Gagal membaca berkas.'); loadingBtn(btn, false); }; rd.readAsDataURL(f);
 }
 function savePKS(btn) {
   const p = curP(); const v = { id: p.id }; const m = { para_pihak: 'pkPihak', ruang_lingkup: 'pkRuang', masa_berlaku: 'pkMasa', tgl_lapor_gubernur: 'pkLapor', bukti_lapor: 'pkBukti' };
@@ -160,7 +165,7 @@ function gAtur() {
 }
 function showPw(title, user, pw) { modal({ title: title, body: '<p>Akun: <b>' + esc(user.email) + '</b></p><p style="margin-top:8px">Kata sandi sementara:</p><div class="card" style="font-family:monospace;font-size:18px;text-align:center;padding:12px;margin-top:6px;user-select:all">' + esc(pw) + '</div><p class="hint" style="margin-top:8px">Catat sekarang; kata sandi tidak ditampilkan lagi.</p>', hideCancel: true }); }
 function addUser() {
-  const roles = [['prl', 'Tim Bidang PRL'], ['uptd', 'UPTD Pengelola Kawasan'], ['kepala_dkp', 'Kepala Dinas'], ['admin', 'Admin Sistem'], ['mitra', 'Mitra']];
+  const roles = [['prl', 'Tim Bidang PRL'], ['uptd', 'UPTD Pengelola Kawasan'], ['kepala_dkp', 'Kepala Dinas'], ['admin', 'Admin (UPTD) — validasi & unggah TTD'], ['superadmin', 'Super Admin'], ['mitra', 'Mitra']];
   modal({ title: 'Tambah pengguna', body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="auN"></div><div class="fld"><label>' + (googleOnlyUI() ? 'Email Google' : 'Email') + ' <i>*</i></label><input class="in" type="email" id="auE"></div><div class="row2"><div class="fld"><label>Peran <i>*</i></label><select class="in" id="auR">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div><div class="fld"><label>Lembaga</label><input class="in" id="auL"></div></div>', ok: 'Buat akun', onOk: function () {
     return api('buat_user', { nama: $('auN').value, email: $('auE').value, peran: $('auR').value, lembaga: $('auL').value }).then(function (r) { S.users = null; setTimeout(function () { if (r.password) showPw('Akun dibuat', r.user, r.password); else modal({ title: 'Akun dibuat', body: '<p>Pengguna <b>' + esc(r.user.email) + '</b> dapat langsung masuk dengan tombol <b>Masuk dengan Google</b> memakai akun Google tersebut. Tidak ada kata sandi yang perlu dibagikan.</p>', ok: 'Mengerti', hideCancel: true, onOk: function () { closeModal(); } }); if (S.view === 'users') vUsers(); }, 50); });
   } });
@@ -171,14 +176,23 @@ function vMaster() {
   setTitle('Data Master'); const m = S.master;
   setView('<div class="ph"><div><h2>Data master</h2><p>Kawasan, persyaratan per jenis mitra, dan kontak bantuan.</p></div><div class="sp"></div><button class="btn btn-p" data-act="saveMaster">' + mi('save') + ' Simpan semua</button></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Kawasan konservasi</h3><p class="sub">Satu baris per kawasan. Format: <code>Nama | Dasar hukum | Zona1; Zona2</code></p><textarea class="in" id="mKaw" rows="6">' + esc(m.kawasan.map(function (k) { return k.nama + ' | ' + (k.dasar || '') + ' | ' + k.zona.join('; '); }).join('\n')) + '</textarea></div>' +
+    '<div class="card" style="margin-bottom:16px"><h3>Program Dinas yang ditawarkan ke mitra</h3><p class="sub">Satu program per baris. Format: <code>Nama program | Deskripsi singkat</code>. Tambahkan <code>| nonaktif</code> di akhir baris untuk menyembunyikan dari pilihan mitra tanpa menghapus riwayatnya.</p><textarea class="in" id="mProg" rows="12">' + esc(progLinesText()) + '</textarea></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Persyaratan per jenis mitra</h3><p class="sub">Satu persyaratan per baris.</p>' + m.jenis.map(function (j) { return '<div class="fld"><label>' + esc(j.nama) + '</label><textarea class="in" rows="3" data-mj="' + esc(j.kode) + '">' + esc((m.persyaratan[j.kode] || []).join('\n')) + '</textarea></div>'; }).join('') + '</div>' +
     batasCardHtml() + warnaCardHtml() + arcCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div></div>');
   fillBatas();
 }
+/** Baris: "Nama | Deskripsi | nonaktif(opsional)". Id lama dipertahankan bila nama sama. */
+function progLinesText() { return ((S.master && S.master.program) || []).map(function (x) { return x.nama + ' | ' + (x.deskripsi || '') + (x.aktif ? '' : ' | nonaktif'); }).join('\n'); }
+function progLinesParse() {
+  const lama = {}; ((S.master && S.master.program) || []).forEach(function (x) { lama[x.nama.trim().toLowerCase()] = x.id; });
+  return $('mProg').value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+    const p = l.split('|'); const nama = (p[0] || '').trim(); return { id: lama[nama.toLowerCase()] || '', nama: nama, deskripsi: (p[1] || '').trim(), aktif: !/^\s*nonaktif\s*$/i.test(p[2] || '') };
+  });
+}
 function saveMaster(btn) {
   const kaw = $('mKaw').value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) { const p = l.split('|'); return { nama: (p[0] || '').trim(), dasar: (p[1] || '').trim(), zona: (p[2] || '').split(';').map(function (z) { return z.trim(); }).filter(Boolean) }; });
   const per = {}; document.querySelectorAll('[data-mj]').forEach(function (t) { per[t.dataset.mj] = t.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); });
-  loadingBtn(btn, true); api('master_simpan', { kawasan: kaw, persyaratan: per, config: { helpdesk_email: $('mHE').value, helpdesk_telp: $('mHT').value, arcgis_layers: Array.prototype.map.call(document.querySelectorAll('#arcList .arc-row'), function (r) { return { nama: r.querySelector('[data-an]').value, url: r.querySelector('[data-au]').value, kolom: r.querySelector('[data-ak]').value }; }).filter(function (l) { return l.nama.trim() || l.url.trim(); }) } }).then(function (m) { S.master = m; persist(); toast('ok', 'Data master tersimpan.'); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(btn, false); });
+  loadingBtn(btn, true); api('master_simpan', { kawasan: kaw, persyaratan: per, config: { helpdesk_email: $('mHE').value, helpdesk_telp: $('mHT').value, arcgis_layers: Array.prototype.map.call(document.querySelectorAll('#arcList .arc-row'), function (r) { return { nama: r.querySelector('[data-an]').value, url: r.querySelector('[data-au]').value, kolom: r.querySelector('[data-ak]').value }; }).filter(function (l) { return l.nama.trim() || l.url.trim(); }) } }).then(function (m) { S.master = m; return api('program_simpan', { programs: progLinesParse() }).then(function (pr) { S.master.program = pr; persist(); toast('ok', 'Data master tersimpan.'); }); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(btn, false); });
 }
 
 /* ----------------------------- Akun ----------------------------- */
@@ -203,6 +217,14 @@ function openVerif() {
 /* ----------------------------- Delegasi event ----------------------------- */
 const CHG = {};
 CHG.warna = function (t) { const c = S.master.config = S.master.config || {}; c.warna_kategori = Object.assign({}, c.warna_kategori); c.warna_kategori[t.dataset.kat.trim().toLowerCase()] = t.value; simpanWarna(); fillWarna(); };
+CHG.progDinas = function (t) {
+  const d = S.wiz.data; const pd = (S.master.program || []).filter(function (x) { return x.id === t.dataset.id; })[0]; if (!pd) return;
+  const rest = progList(d).filter(function (x) { return !(x.jenis === 'dinas' && x.id_program === pd.id); });
+  d.programs = t.checked ? progList(d).filter(function (x) { return !(x.jenis === 'dinas' && x.id_program === pd.id); }).concat([{ jenis: 'dinas', id_program: pd.id, nama: pd.nama, keterangan: '' }]) : rest;
+  if (!S.wiz.editId) LS.set('sm_form', d);
+};
+CHG.progNama = function (t) { const own = progList(S.wiz.data).filter(function (x) { return x.jenis === 'mandiri'; })[+t.dataset.i]; if (own) { own.nama = t.value; if (!S.wiz.editId) LS.set('sm_form', S.wiz.data); } };
+CHG.progKet = function (t) { const own = progList(S.wiz.data).filter(function (x) { return x.jenis === 'mandiri'; })[+t.dataset.i]; if (own) { own.keterangan = t.value; if (!S.wiz.editId) LS.set('sm_form', S.wiz.data); } };
 const ACT = {
   pfBatal: function () { $('formProfil').hidden = true; $('googleBox').hidden = false; S._gcredReg = null; },
   gRetry: function () { applyAuthMode(); },
@@ -237,7 +259,9 @@ const ACT = {
   },
   batalJadwal: function () { const p = curP(), d = ensureDet(); modal({ title: 'Batalkan jadwal pemaparan?', body: '<p>Mitra akan diberi tahu. Pemaparan tidak dapat ditandai selesai sebelum jadwal baru ditetapkan.</p>', ok: 'Batalkan jadwal', danger: true, onOk: function () { return api('jadwal_simpan', { id: p.id, batalkan: true }).then(function (r) { d.jadwal = r; renderDetailBody(); toast('ok', 'Jadwal dibatalkan.'); }); } }); },
   saveCk: saveChecklist, saveTp: saveTelaahProgram, saveTb: saveTelaahBiaya, saveMv: saveMonev,
-  saveBA: function (el) { saveBA(el, el.dataset.j); }, sahBA: function (el) { sahkanBA(el.dataset.id); }, savePks: function (el) { savePKS(el); },
+  progAdd: function () { const d = S.wiz.data; d.programs = progList(d).concat([{ jenis: 'mandiri', id_program: '', nama: '', keterangan: '' }]); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
+  progDel: function (el) { const d = S.wiz.data; const own = progList(d).filter(function (x) { return x.jenis === 'mandiri'; })[+el.dataset.i]; d.programs = progList(d).filter(function (x) { return x !== own; }); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
+  ttdUp: function (el) { ttdUpload(el, el.dataset.j); }, savePks: function (el) { savePKS(el); },
   dl: function (el, e) { e.preventDefault(); downloadFile(el.dataset.id); }, delFile: function (el) { deleteFile(el.dataset.id); },
   addUser: addUser, saveMaster: saveMaster, gAtur: gAtur,
   editUser: function (el) { const u = S.users.filter(function (x) { return x.id === el.dataset.id; })[0]; if (u) editUser(u); },

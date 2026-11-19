@@ -17,7 +17,7 @@ const JENIS_FALLBACK = [
   ['penelitian_dn', 'Lembaga Penelitian Dalam Negeri'], ['penelitian_asing', 'Lembaga Penelitian Asing'],
   ['pt_nasional', 'Perguruan Tinggi Nasional'], ['pt_asing', 'Perguruan Tinggi Asing']
 ];
-const SHORT = ['Koordinasi', 'Permohonan', 'Verif. Adm', 'Ruang & RPZ', 'Penilaian', 'Pemaparan', 'Penelaahan', 'Kesepakatan', 'Draft PKS', 'Lapor Gub.', 'TTD PKS', 'Monev'];
+const SHORT = ['Koordinasi', 'Permohonan', 'Verif. Adm', 'Ruang & RPZ', 'Penilaian', 'Pemaparan', 'Penelaahan', 'Kesepakatan', 'Draft PKS', 'Lapor ke DKP', 'TTD PKS', 'Monev'];
 const FINAL = ['Tidak dilanjutkan', 'Selesai'];
 const LOGO_FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e8f94'/%3E%3Cpath d='M8 21h16l-3 4H11zM16 6v13M16 8l7 10h-7z' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E";
 const NILAI = ['Sesuai', 'Perlu Perbaikan', 'Tidak Sesuai'];
@@ -39,7 +39,10 @@ function ago(iso) { const s = (Date.now() - new Date(iso)) / 1000; if (s < 60) r
 function initials(n) { return String(n || '?').trim().split(/\s+/).slice(0, 2).map(function (x) { return x[0]; }).join('').toUpperCase(); }
 function words(s) { return String(s || '').trim() ? String(s).trim().split(/\s+/).length : 0; }
 function debounce(fn, ms) { let t; return function () { const a = arguments, c = this; clearTimeout(t); t = setTimeout(function () { fn.apply(c, a); }, ms); }; }
-function isStaff() { return S.me && ['prl', 'uptd', 'kepala_dkp', 'admin'].indexOf(S.me.peran) > -1; }
+function isStaff() { return S.me && ['prl', 'uptd', 'kepala_dkp', 'admin', 'superadmin'].indexOf(S.me.peran) > -1; }
+/** Super Admin = akses penuh; selain itu harus termasuk daftar peran. */
+function isSuper() { return !!S.me && S.me.peran === 'superadmin'; }
+function can(roles) { return !!S.me && (S.me.peran === 'superadmin' || roles.indexOf(S.me.peran) > -1); }
 function mi(n, extra) { return '<span class="mi"' + (extra ? ' style="' + extra + '"' : '') + ' aria-hidden="true">' + n + '</span>'; }
 function stageName(n) { const s = S.master && S.master.stages[n - 1]; return s ? s.nama : 'Tahap ' + n; }
 function statusClass(p) {
@@ -138,7 +141,7 @@ function navItems() {
   a.push({ grp: 'Laporan & Verifikasi' });
   a.push({ id: 'statistik', ic: 'bar_chart', t: 'Laporan & Statistik' });
   a.push({ id: 'verifikasi', ic: 'verified_user', t: 'Verifikasi Dokumen' });
-  if (r === 'admin') { a.push({ grp: 'Administrasi' }); a.push({ id: 'users', ic: 'group', t: 'Manajemen Pengguna' }); a.push({ id: 'master', ic: 'tune', t: 'Data Master & Batas' }); }
+  if (r === 'superadmin') { a.push({ grp: 'Administrasi' }); a.push({ id: 'users', ic: 'group', t: 'Manajemen Pengguna' }); a.push({ id: 'master', ic: 'tune', t: 'Data Master & Batas' }); }
   return a;
 }
 function navActive(it) { if (it.grp || it.id !== S.view) return false; if (it.id === 'daftar') return pkey(it.p) === pkey(S.params); return true; }
@@ -166,13 +169,13 @@ function setView(html) { $('view').innerHTML = html; }
 function needsAction(p) {
   if (FINAL.indexOf(p.status) > -1 || p._pending) return false; const r = S.me.peran;
   if (r === 'mitra') return p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi');
-  if (r === 'admin' || p.tahap === 12) return false;
+  if (r === 'superadmin' || p.tahap === 12) return false;
   return (S.master.trans[p.tahap] || []).some(function (t) { return t.roles.indexOf(r) > -1 && (!t.onlyStatus || t.onlyStatus === p.status) && !t.owner; });
 }
 function opsiFor(p) {
   if (FINAL.indexOf(p.status) > -1 || p._pending) return [];
   return (S.master.trans[p.tahap] || []).filter(function (t) {
-    if (t.roles.indexOf(S.me.peran) === -1) return false;
+    if (S.me.peran === 'superadmin') { if (t.owner) return false; } else if (t.roles.indexOf(S.me.peran) === -1) return false;
     if (t.onlyStatus && t.onlyStatus !== p.status) return false;
     if (p.tahap === 1 && !t.onlyStatus && p.status === 'Perlu dilengkapi') return false;
     if (t.owner && S.me.peran === 'mitra' && p.id_user !== S.me.id) return false;

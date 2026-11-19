@@ -5,8 +5,9 @@ function vForm() {
   if (!S.wiz || S.wiz.editId !== (id || null)) {
     const p = id && pById(id); const saved = !id && LS.get('sm_form');
     S.wiz = { step: 0, editId: id || null, data: p ? { judul: p.judul, uraian: p.uraian, jangka: p.jangka, kawasan: p.kawasan, zona: p.zona, lokasi: p.lokasi, luas: p.luas, biaya: p.biaya, sumber: p.sumber } : (saved || {}) };
+    if (id) { const cd = S.det[id] && S.det[id].d; if (cd) S.wiz.data.programs = progFromDet(cd.programs); else loadDetail(id).then(function (r) { if (S.wiz && S.wiz.editId === id && S.wiz.data.programs === undefined) { S.wiz.data.programs = progFromDet(r.programs); if (S.view === 'form') renderWiz(); } }); }
   }
-  if (S.me.peran === 'admin' && !S.users) api('daftar_user').then(function (u) { S.users = u; if (S.view === 'form') renderWiz(); }).catch(function () {});
+  if (isSuper() && !S.users) api('daftar_user').then(function (u) { S.users = u; if (S.view === 'form') renderWiz(); }).catch(function () {});
   setView('<div class="ph"><div><h2>' + (id ? 'Ubah pengajuan' : 'Formulir Pengajuan (Lampiran II)') + '</h2><p>Isi data program kemitraan. Draft tersimpan otomatis di perangkat ini.</p></div></div><div class="card" id="wizBox"></div>');
   renderWiz();
 }
@@ -15,12 +16,12 @@ function renderWiz() {
   const w = S.wiz, d = w.data, st = w.step; const f = function (k) { return esc(d[k] === undefined ? '' : d[k]); };
   let c = '';
   if (st === 0) {
-    if (S.me.peran === 'admin') c = '<div class="fld"><label>Mitra pemilik pengajuan <i>*</i></label><select class="in" data-f="id_user"><option value="">Pilih mitra…</option>' + (S.users || []).filter(function (u) { return u.peran === 'mitra' && u.aktif; }).map(function (u) { return '<option value="' + esc(u.id) + '"' + (d.id_user === u.id ? ' selected' : '') + '>' + esc(u.lembaga + ' — ' + u.nama) + '</option>'; }).join('') + '</select></div>';
+    if (isSuper()) c = '<div class="fld"><label>Mitra pemilik pengajuan <i>*</i></label><select class="in" data-f="id_user"><option value="">Pilih mitra…</option>' + (S.users || []).filter(function (u) { return u.peran === 'mitra' && u.aktif; }).map(function (u) { return '<option value="' + esc(u.id) + '"' + (d.id_user === u.id ? ' selected' : '') + '>' + esc(u.lembaga + ' — ' + u.nama) + '</option>'; }).join('') + '</select></div>';
     else c = '<dl class="kv"><dt>Lembaga</dt><dd>' + esc(S.me.lembaga) + '</dd><dt>Jenis mitra</dt><dd>' + esc(jenisNama(S.me.jenis_mitra)) + '</dd><dt>Penanggung jawab</dt><dd>' + esc(S.me.nama) + '</dd><dt>Email</dt><dd>' + esc(S.me.email) + '</dd></dl><div class="callout info" style="margin-top:14px">' + mi('info') + '<span>Data identitas diambil dari akun Anda. Ubah melalui administrator bila keliru.</span></div>';
   } else if (st === 1) {
     c = '<div class="fld"><label>Judul / nama program <i>*</i></label><input class="in" data-f="judul" value="' + f('judul') + '"></div>' +
       '<div class="fld"><label>Uraian program <i>*</i> <span class="hint" id="wc">(' + words(d.uraian) + '/500 kata)</span></label><textarea class="in" data-f="uraian" rows="6">' + f('uraian') + '</textarea></div>' +
-      '<div class="fld"><label>Jangka waktu kemitraan</label><input class="in" data-f="jangka" placeholder="mis. 3 Tahun" value="' + f('jangka') + '"></div>';
+      '<div class="fld"><label>Jangka waktu kemitraan</label><input class="in" data-f="jangka" placeholder="mis. 3 Tahun" value="' + f('jangka') + '"></div>' + progPicker(d);
   } else if (st === 2) {
     const k = S.master.kawasan.filter(function (x) { return x.nama === d.kawasan; })[0]; const zs = k ? k.zona : [];
     c = '<div class="row2"><div class="fld"><label>Kawasan konservasi <i>*</i></label><select class="in" data-f="kawasan"><option value="">Pilih kawasan…</option>' + S.master.kawasan.map(function (x) { return '<option' + (d.kawasan === x.nama ? ' selected' : '') + '>' + esc(x.nama) + '</option>'; }).join('') + '</select></div>' +
@@ -32,13 +33,31 @@ function renderWiz() {
       '<div class="callout info">' + mi('attach_file') + '<span>Dokumen persyaratan diunggah pada halaman detail setelah draft disimpan.</span></div>';
   } else {
     const req = (S.master.persyaratan[S.me.jenis_mitra] || []);
-    c = '<dl class="kv"><dt>Judul</dt><dd>' + f('judul') + '</dd><dt>Kawasan / zona</dt><dd>' + f('kawasan') + ' / ' + f('zona') + '</dd><dt>Lokasi</dt><dd>' + f('lokasi') + ' (' + f('luas') + ')</dd><dt>Jangka</dt><dd>' + f('jangka') + '</dd><dt>Anggaran</dt><dd>' + rp(d.biaya) + ' · ' + f('sumber') + '</dd><dt>Uraian</dt><dd>' + f('uraian') + '</dd></dl>' +
+    c = '<dl class="kv"><dt>Judul</dt><dd>' + f('judul') + '</dd><dt>Kawasan / zona</dt><dd>' + f('kawasan') + ' / ' + f('zona') + '</dd><dt>Lokasi</dt><dd>' + f('lokasi') + ' (' + f('luas') + ')</dd><dt>Jangka</dt><dd>' + f('jangka') + '</dd><dt>Anggaran</dt><dd>' + rp(d.biaya) + ' · ' + f('sumber') + '</dd><dt>Uraian</dt><dd>' + f('uraian') + '</dd><dt>Program</dt><dd>' + progReview(d) + '</dd></dl>' +
       (req.length && S.me.peran === 'mitra' ? '<h3 style="margin:16px 0 6px">Dokumen yang perlu disiapkan</h3><ul style="padding-left:18px;color:var(--tx-2)">' + req.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' : '');
     if (d.area && d.area.geojson) c += '<p class="t-sub" style="margin-top:10px">Area peta: ' + numID(MapKit.areaHa(MapKit.parse(d.area.geojson))) + ' Ha</p>';
   }
   $('wizBox').innerHTML = '<div class="wiz-h">' + WSTEPS.map(function (s, i) { return '<span class="' + (i <= st ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</span>'; }).join('') + '</div><div class="wiz">' + WSTEPS.map(function (s, i) { return '<div class="' + (i <= st ? 'on' : '') + '"></div>'; }).join('') + '</div>' + c +
     '<div id="wErr" class="errtxt" role="alert"></div><div class="act-bar" style="position:static;box-shadow:none;border:0;padding:12px 0 0"><button class="btn btn-o" data-act="wBack">' + (st ? 'Kembali' : 'Batal') + '</button><div class="sp"></div>' +
     (st === 4 ? '<button class="btn btn-p" data-act="wSave">' + mi('save') + ' ' + (w.editId ? 'Simpan perubahan' : 'Simpan draft') + '</button>' : '<button class="btn btn-p" data-act="wNext">Lanjut ' + mi('arrow_forward') + '</button>') + '</div>';
+}
+/* ----------------------------- Program yang dijalankan mitra ----------------------------- */
+function progFromDet(list) { return (list || []).map(function (x) { return { jenis: x.jenis, id_program: x.id_program, nama: x.nama, keterangan: x.keterangan || '' }; }); }
+function progList(d) { return Array.isArray(d.programs) ? d.programs : []; }
+function progPicker(d) {
+  const sel = progList(d); const dinas = (S.master.program || []).filter(function (x) { return x.aktif; });
+  const isSel = function (id) { return sel.some(function (x) { return x.jenis === 'dinas' && x.id_program === id; }); };
+  const mand = sel.filter(function (x) { return x.jenis === 'mandiri'; });
+  return '<div class="fld" style="margin-top:6px"><label>Program yang akan dijalankan <i>*</i> <span class="hint">(' + sel.length + ' dipilih)</span></label><p class="hint">Pilih program yang ditawarkan Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah, dan/atau tambahkan program Anda sendiri.</p>' +
+    '<div class="prog-list">' + (dinas.length ? dinas.map(function (x) {
+      return '<label class="prog-it"><input type="checkbox" data-chg="progDinas" data-id="' + esc(x.id) + '"' + (isSel(x.id) ? ' checked' : '') + '><span><b>' + esc(x.nama) + '</b>' + (x.deskripsi ? '<small>' + esc(x.deskripsi) + '</small>' : '') + '</span></label>';
+    }).join('') : '<p class="hint">Dinas belum menetapkan program yang ditawarkan.</p>') + '</div>' +
+    '<h4 style="margin:14px 0 6px">Program sendiri</h4>' + mand.map(function (x, i) {
+      return '<div class="prog-own"><input class="in" data-chg="progNama" data-i="' + i + '" placeholder="Nama program" value="' + esc(x.nama) + '"><input class="in" data-chg="progKet" data-i="' + i + '" placeholder="Keterangan singkat (opsional)" value="' + esc(x.keterangan) + '"><button type="button" class="btn btn-o btn-s" data-act="progDel" data-i="' + i + '" aria-label="Hapus program">' + mi('delete') + '</button></div>';
+    }).join('') + '<button type="button" class="btn btn-o btn-s" data-act="progAdd">' + mi('add') + ' Tambah program sendiri</button></div>';
+}
+function progReview(d) {
+  const l = progList(d); return l.length ? '<ul style="padding-left:18px">' + l.map(function (x) { return '<li>' + esc(x.nama) + (x.jenis === 'mandiri' ? ' <span class="chip c-draft">Program sendiri</span>' : ' <span class="chip c-teal">Program Dinas</span>') + (x.keterangan ? '<div class="t-sub">' + esc(x.keterangan) + '</div>' : '') + '</li>'; }).join('') + '</ul>' : '<span class="t-sub">-</span>';
 }
 function wizMapInit() {
   const el = $('wizMap'); if (!el || S.view !== 'form' || !S.wiz || S.wiz.step !== 2) return; const d = S.wiz.data;
@@ -48,8 +67,8 @@ function wizMapInit() {
 }
 function wizValidate(st) {
   const d = S.wiz.data;
-  if (st === 0 && S.me.peran === 'admin' && !d.id_user) return 'Pilih mitra pemilik pengajuan.';
-  if (st === 1) { if (!(d.judul || '').trim() || !(d.uraian || '').trim()) return 'Judul dan uraian program wajib diisi.'; if (words(d.uraian) > 500) return 'Uraian maksimal 500 kata.'; }
+  if (st === 0 && isSuper() && !d.id_user) return 'Pilih mitra pemilik pengajuan.';
+  if (st === 1) { if (!progList(d).length) return 'Pilih minimal satu program Dinas atau tambahkan program sendiri.'; if (progList(d).some(function (x) { return x.jenis === 'mandiri' && !x.nama.trim(); })) return 'Nama program sendiri tidak boleh kosong.'; if (!(d.judul || '').trim() || !(d.uraian || '').trim()) return 'Judul dan uraian program wajib diisi.'; if (words(d.uraian) > 500) return 'Uraian maksimal 500 kata.'; }
   if (st === 2 && (!d.kawasan || !d.zona || !(d.lokasi || '').trim())) return 'Kawasan, zona, dan lokasi wajib diisi.';
   if (st === 3 && d.biaya !== undefined && d.biaya !== '' && Number(d.biaya) < 0) return 'Anggaran tidak boleh negatif.';
   return '';
@@ -57,7 +76,7 @@ function wizValidate(st) {
 function wizSave() {
   const w = S.wiz; const d = Object.assign({}, w.data); d.biaya = d.biaya === undefined ? '' : d.biaya; const now = new Date().toISOString();
   if (w.editId) {
-    const before = Object.assign({}, pById(w.editId)); replaceP(Object.assign({}, before, d, { diubah: now }));
+    const before = Object.assign({}, pById(w.editId)); if (d.programs !== undefined) delete S.det[before.id]; replaceP(Object.assign({}, before, d, { diubah: now }));
     toast('ok', 'Perubahan disimpan.'); S.wiz = null; navigateTo('detail', { id: before.id }, { replace: true });
     bg('Simpan perubahan', function () { d.id = before.id; return api('ubah', d).then(function (r) { replaceP(r); delete S.det[r.id]; }); }, function () { replaceP(before); });
     return;
@@ -85,7 +104,7 @@ function vDetail() {
 }
 function detData() { const c = S.det[S.params.id]; return c && c.d ? c.d : null; }
 function canUploadDoc(p) { if (FINAL.indexOf(p.status) > -1) return false; if (S.me.peran === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi'); return true; }
-function canEditP(p) { return S.me.peran !== 'prl' && S.me.peran !== 'uptd' && S.me.peran !== 'kepala_dkp' && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi') && (S.me.peran === 'admin' || p.id_user === S.me.id); }
+function canEditP(p) { return S.me.peran !== 'prl' && S.me.peran !== 'uptd' && S.me.peran !== 'admin' && S.me.peran !== 'kepala_dkp' && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi') && (isSuper() || p.id_user === S.me.id); }
 function tabsFor(p) {
   const t = [['ringkasan', 'Ringkasan'], ['dokumen', 'Dokumen']];
   if (isStaff() || p.tahap > 3) t.push(['checklist', 'Checklist Administrasi (L-III)']);
@@ -116,7 +135,7 @@ function tRingkasan(p, d) {
   else if (p.status === 'Perlu dilengkapi') warn = '<div class="callout warn">' + mi('warning') + '<span><b>Perlu dilengkapi.</b> Lihat catatan pada tab Riwayat.</span></div>';
   if (p.status === 'Tidak dilanjutkan') warn = '<div class="callout bad">' + mi('block') + '<span>Pengajuan tidak dilanjutkan.</span></div>';
   if (d && d.jadwal && d.jadwal.status !== 'Dibatalkan' && p.tahap <= 6) warn += '<div class="callout ok" data-act="gotoTab" data-tab="jadwal" style="cursor:pointer">' + mi('event') + '<span><b>Pemaparan dijadwalkan:</b> ' + jadwalTeks(d.jadwal) + '</span></div>';
-  return warn + '<div class="grid g-main"><div class="card"><h3>Data program</h3><p class="sub">Lampiran II</p><dl class="kv"><dt>Lembaga</dt><dd>' + esc(p.lembaga) + '</dd><dt>Jenis mitra</dt><dd>' + esc(jenisNama(p.jenis_mitra)) + '</dd><dt>Kawasan / zona</dt><dd>' + esc(p.kawasan) + ' / ' + esc(p.zona) + '</dd><dt>Lokasi</dt><dd>' + esc(p.lokasi) + ' ' + (p.luas ? '(' + esc(p.luas) + ')' : '') + '</dd><dt>Jangka waktu</dt><dd>' + esc(p.jangka || '-') + '</dd><dt>Anggaran</dt><dd>' + rp(p.biaya) + ' · ' + esc(p.sumber || '-') + '</dd><dt>Uraian</dt><dd style="white-space:pre-wrap">' + esc(p.uraian) + '</dd></dl></div>' +
+  return warn + '<div class="grid g-main"><div class="card"><h3>Data program</h3><p class="sub">Lampiran II</p><dl class="kv"><dt>Lembaga</dt><dd>' + esc(p.lembaga) + '</dd><dt>Jenis mitra</dt><dd>' + esc(jenisNama(p.jenis_mitra)) + '</dd><dt>Kawasan / zona</dt><dd>' + esc(p.kawasan) + ' / ' + esc(p.zona) + '</dd><dt>Lokasi</dt><dd>' + esc(p.lokasi) + ' ' + (p.luas ? '(' + esc(p.luas) + ')' : '') + '</dd><dt>Jangka waktu</dt><dd>' + esc(p.jangka || '-') + '</dd><dt>Anggaran</dt><dd>' + rp(p.biaya) + ' · ' + esc(p.sumber || '-') + '</dd><dt>Uraian</dt><dd style="white-space:pre-wrap">' + esc(p.uraian) + '</dd><dt>Program</dt><dd>' + (d ? progReview({ programs: progFromDet(d.programs) }) : '<span class="t-sub">Memuat…</span>') + '</dd></dl></div>' +
     '<div class="card"><h3>Status</h3><p class="sub">Posisi saat ini</p><dl class="kv" style="grid-template-columns:100px 1fr"><dt>Tahap</dt><dd>' + p.tahap + '/12 — ' + esc(stageName(p.tahap)) + '</dd><dt>Status</dt><dd>' + chip(p) + '</dd><dt>Dibuat</dt><dd>' + fmtD(p.dibuat) + '</dd><dt>Diperbarui</dt><dd>' + fmtDT(p.diubah) + '<br><span class="t-sub">oleh ' + esc(p.diubah_oleh) + '</span></dd><dt>Pelaku tahap</dt><dd>' + esc((S.master.stages[p.tahap - 1] || {}).pelaku || '') + '</dd></dl></div></div>';
 }
 function fileChip(b, del) { return '<span class="file">' + mi('description', 'font-size:15px') + '<a href="#" data-act="dl" data-id="' + esc(b.id) + '">' + esc(b.nama) + '</a><span class="t-sub">' + Math.round((b.ukuran || 0) / 1024) + ' KB</span>' + (del ? '<button data-act="delFile" data-id="' + esc(b.id) + '" aria-label="Hapus berkas">' + mi('close', 'font-size:15px') + '</button>' : '') + '</span>'; }
@@ -148,7 +167,7 @@ function tDokumen(p, d) {
     '<div class="dok-body"><nav class="dok-menu" aria-label="Daftar persyaratan">' + menu + '</nav>' + pane + '</div></div>';
 }
 function tChecklist(p, d) {
-  const items = S.master.persyaratan[p.jenis_mitra] || []; const edit = (S.me.peran === 'prl' || S.me.peran === 'admin') && p.tahap === 3 && FINAL.indexOf(p.status) === -1;
+  const items = S.master.persyaratan[p.jenis_mitra] || []; const edit = can(['prl', 'admin']) && p.tahap === 3 && FINAL.indexOf(p.status) === -1;
   const cl = {}; d.checklist.forEach(function (c) { cl[c.item] = c; });
   const done = items.filter(function (i) { return cl[i] && cl[i].status === 'Sesuai'; }).length;
   return '<div class="card"><h3>Checklist administrasi (Lampiran III)</h3><p class="sub">' + done + ' dari ' + items.length + ' persyaratan sesuai.</p><p class="hint" style="margin:4px 0 10px">Lampiran III adalah daftar periksa kelengkapan persyaratan administrasi yang diverifikasi PRL pada Tahap 3, sebelum usulan diteruskan ke verifikasi ruang/RPZ (Tahap 4). Tandai tiap persyaratan <b>Sesuai</b> atau <b>Tidak sesuai</b> berdasarkan berkas yang diunggah mitra.</p>' + (items.length ? '' : '<div class="callout warn">' + mi('warning') + '<span>Daftar persyaratan kosong karena jenis mitra pengajuan ini belum terisi. Periksa data pengajuan atau persyaratan di Data Master.</span></div>') + items.map(function (it, i) {
@@ -158,7 +177,7 @@ function tChecklist(p, d) {
   }).join('') + (edit ? '<div style="text-align:right;margin-top:12px"><button class="btn btn-p" data-act="saveCk">' + mi('save') + ' Simpan checklist</button></div>' : '') + '</div>';
 }
 function tTelaah(p, d) {
-  const edit = ['prl', 'uptd', 'admin'].indexOf(S.me.peran) > -1 && (p.tahap === 4 || p.tahap === 5) && FINAL.indexOf(p.status) === -1;
+  const edit = can(['prl', 'uptd']) && (p.tahap === 4 || p.tahap === 5) && FINAL.indexOf(p.status) === -1;
   const tp = d.telaah_program || { data: {}, rekomendasi: '' }; const tb = d.telaah_pembiayaan || {};
   return '<div class="card" style="margin-bottom:16px"><h3>Telaah program (Lampiran IV/V)</h3><p class="sub">10 aspek penelaahan.</p>' + S.master.aspek.map(function (a, i) {
     const v = tp.data[a] || {};
@@ -166,34 +185,47 @@ function tTelaah(p, d) {
   }).join('') + '<div class="fld" style="margin-top:12px"><label>Rekomendasi</label>' + (edit ? '<textarea class="in" id="tpRek">' + esc(tp.rekomendasi || '') + '</textarea>' : '<div>' + esc(tp.rekomendasi || '-') + '</div>') + '</div>' + (edit ? '<div style="text-align:right"><button class="btn btn-p" data-act="saveTp">' + mi('save') + ' Simpan telaah program</button></div>' : '') + '</div>' +
     '<div class="card"><h3>Telaah pembiayaan</h3><p class="sub">Rencana dan porsi pembiayaan.</p>' + (edit ? '<div class="row2"><div class="fld"><label>Rencana biaya</label><input class="in" id="tbR" value="' + esc(tb.rencana_biaya || '') + '"></div><div class="fld"><label>Sumber</label><input class="in" id="tbS" value="' + esc(tb.sumber_pembiayaan || '') + '"></div></div><div class="row3"><div class="fld"><label>Porsi mitra</label><input class="in" id="tbM" value="' + esc(tb.porsi_mitra || '') + '"></div><div class="fld"><label>Porsi DKP</label><input class="in" id="tbD" value="' + esc(tb.porsi_dkp || '') + '"></div><div class="fld"><label>Porsi lain</label><input class="in" id="tbL" value="' + esc(tb.porsi_lain || '') + '"></div></div><div class="fld"><label>Rekomendasi</label><textarea class="in" id="tbRek">' + esc(tb.rekomendasi || '') + '</textarea></div><div style="text-align:right"><button class="btn btn-p" data-act="saveTb">' + mi('save') + ' Simpan telaah pembiayaan</button></div>' : '<dl class="kv"><dt>Rencana biaya</dt><dd>' + esc(tb.rencana_biaya || '-') + '</dd><dt>Sumber</dt><dd>' + esc(tb.sumber_pembiayaan || '-') + '</dd><dt>Porsi mitra / DKP / lain</dt><dd>' + esc(tb.porsi_mitra || '-') + ' / ' + esc(tb.porsi_dkp || '-') + ' / ' + esc(tb.porsi_lain || '-') + '</dd><dt>Rekomendasi</dt><dd>' + esc(tb.rekomendasi || '-') + '</dd></dl>') + '</div>';
 }
+const TTD_SLOTS = [
+  { jenis: 'BA Pemaparan', judul: 'Berita Acara Pemaparan', tahap: [6, 7], ket: 'Hasil pindai BA yang sudah ditandatangani. Wajib sebelum tahap Pemaparan ditandai selesai.', tgl: true },
+  { jenis: 'BA Hasil Penelaahan', judul: 'Berita Acara Hasil Penelaahan', tahap: [7, 8], ket: 'Hasil pindai BA yang sudah ditandatangani. Wajib sebelum kesepakatan dicatat.', tgl: true },
+  { jenis: 'Draft PKS', judul: 'Draft PKS', tahap: [9, 10, 11], ket: 'Naskah draf PKS (belum ditandatangani) untuk dilaporkan ke Dinas.', tgl: false },
+  { jenis: 'PKS Bertanda Tangan', judul: 'PKS Bertanda Tangan', tahap: [11], ket: 'Hasil pindai PKS yang sudah ditandatangani para pihak. Wajib sebelum PKS dinyatakan ditandatangani.', tgl: true }
+];
+function ttdBerkas(d, jenis) { return (d.berkas || []).filter(function (b) { return b.item === '@TTD:' + jenis; })[0]; }
 function tBA(p, d) {
-  const stf = ['prl', 'uptd', 'admin'].indexOf(S.me.peran) > -1 && FINAL.indexOf(p.status) === -1;
-  const baBox = function (jenis, tahaps) {
-    const b = d.ba.filter(function (x) { return x.jenis === jenis; })[0]; const edit = stf && (S.me.peran === 'admin' || tahaps.indexOf(p.tahap) > -1) && !(b && b.status === 'Disahkan');
-    return '<div class="card" style="margin-bottom:16px"><h3>Berita Acara ' + esc(jenis) + ' ' + (b ? '<span class="chip ' + (b.status === 'Disahkan' ? 'c-ok' : 'c-draft') + '">' + esc(b.status) + '</span>' : '') + '</h3><p class="sub">' + (b ? esc(b.nomor) : 'Belum disusun') + (b && b.status === 'Disahkan' ? ' · Kode verifikasi: <b>' + esc(b.kode) + '</b>' : '') + '</p>' +
-      (edit ? '<div class="row2"><div class="fld"><label>Tanggal</label><input type="date" class="in" data-ba="' + esc(jenis) + '" data-k="tanggal" value="' + esc(b ? String(b.tanggal).substr(0, 10) : '') + '"></div><div class="fld"><label>Peserta</label><input class="in" data-ba="' + esc(jenis) + '" data-k="peserta" value="' + esc(b ? b.peserta : '') + '"></div></div><div class="fld"><label>Kesimpulan</label><textarea class="in" data-ba="' + esc(jenis) + '" data-k="kesimpulan">' + esc(b ? b.kesimpulan : '') + '</textarea></div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-p" data-act="saveBA" data-j="' + esc(jenis) + '">' + mi('save') + ' Simpan</button>' + (b ? '<button class="btn btn-n" data-act="sahBA" data-id="' + esc(b.id) + '">' + mi('verified') + ' Sahkan</button>' : '') + '</div>'
-        : (b ? '<dl class="kv"><dt>Tanggal</dt><dd>' + fmtD(b.tanggal) + '</dd><dt>Peserta</dt><dd>' + esc(b.peserta || '-') + '</dd><dt>Kesimpulan</dt><dd>' + esc(b.kesimpulan || '-') + '</dd></dl>' : '<span class="t-sub">-</span>')) + '</div>';
+  const role = can(['prl', 'uptd', 'admin']) && FINAL.indexOf(p.status) === -1;
+  const slot = function (c) {
+    const b = ttdBerkas(d, c.jenis); const win = c.tahap.indexOf(p.tahap) > -1 || isSuper(); const edit = role && win;
+    const rec = c.jenis.indexOf('BA ') === 0 ? d.ba.filter(function (x) { return x.jenis === c.jenis.substr(3); })[0] : d.pks[0];
+    const id = 'tt' + c.jenis.replace(/\W/g, '');
+    const form = edit ? '<div class="fld" style="margin-top:12px"><label>' + (b ? 'Ganti berkas' : 'Unggah berkas') + ' (PDF/JPG/PNG, maks. 8 MB)</label><input type="file" class="in" id="' + id + 'F" accept=".pdf,.jpg,.jpeg,.png"></div>' +
+      '<div class="row2">' + (c.tgl ? '<div class="fld"><label>Tanggal penandatanganan <i>*</i></label><input type="date" class="in" id="' + id + 'T" value="' + esc(rec && rec.tanggal ? String(rec.tanggal).substr(0, 10) : '') + '"></div>' : '') + '<div class="fld"><label>Nomor dokumen</label><input class="in" id="' + id + 'N" value="' + esc(rec && rec.nomor ? rec.nomor : '') + '" placeholder="Opsional"></div></div>' +
+      '<div class="fld"><label>Catatan</label><input class="in" id="' + id + 'C" value="' + esc(c.jenis.indexOf('BA ') === 0 && rec ? rec.kesimpulan || '' : '') + '"></div>' +
+      '<div style="text-align:right"><button class="btn btn-p" data-act="ttdUp" data-j="' + esc(c.jenis) + '">' + mi('upload_file') + ' ' + (b ? 'Ganti berkas' : 'Unggah') + '</button></div>' : '';
+    return '<div class="card" style="margin-bottom:16px"><h3>' + esc(c.judul) + ' ' + (b ? '<span class="chip c-ok">Terunggah</span>' : '<span class="chip c-draft">Belum diunggah</span>') + '</h3><p class="sub">' + esc(c.ket) + '</p>' +
+      (b ? '<div class="dok-files">' + fileChip(b, false) + '</div>' + (rec && rec.nomor ? '<dl class="kv"><dt>Nomor</dt><dd>' + esc(rec.nomor) + '</dd>' + (c.tgl && rec.tanggal ? '<dt>Tanggal</dt><dd>' + fmtD(rec.tanggal) + '</dd>' : '') + '</dl>' : '') : '<p class="hint">Belum ada berkas.</p>') + form + '</div>';
   };
-  const k = d.pks[0]; const kedit = (['prl', 'uptd', 'kepala_dkp', 'admin'].indexOf(S.me.peran) > -1) && [9, 10, 11].indexOf(p.tahap) > -1 && !(k && k.status === 'Ditandatangani');
-  const pks = '<div class="card"><h3>Perjanjian Kemitraan (PKS) ' + (k ? '<span class="chip ' + (k.status === 'Ditandatangani' ? 'c-ok' : 'c-draft') + '">' + esc(k.status) + '</span>' : '') + '</h3><p class="sub">' + (k ? esc(k.nomor) + (k.status === 'Ditandatangani' ? ' · Kode verifikasi: <b>' + esc(k.kode) + '</b>' : '') : 'Belum disusun') + '</p>' +
-    (kedit ? (S.me.peran === 'kepala_dkp' ? '' : '<div class="fld"><label>Para pihak</label><input class="in" id="pkPihak" value="' + esc(k ? k.para_pihak : '') + '"></div><div class="fld"><label>Ruang lingkup</label><textarea class="in" id="pkRuang">' + esc(k ? k.ruang_lingkup : '') + '</textarea></div><div class="fld"><label>Masa berlaku</label><input class="in" id="pkMasa" value="' + esc(k ? k.masa_berlaku : '') + '"></div>') +
-      (['kepala_dkp', 'admin'].indexOf(S.me.peran) > -1 ? '<div class="row2"><div class="fld"><label>Tanggal lapor ke Gubernur</label><input type="date" class="in" id="pkLapor" value="' + esc(k ? String(k.tgl_lapor_gubernur).substr(0, 10) : '') + '"></div><div class="fld"><label>Bukti pelaporan (nomor/uraian)</label><input class="in" id="pkBukti" value="' + esc(k ? k.bukti_lapor : '') + '"></div></div>' : '') + '<div style="text-align:right"><button class="btn btn-p" data-act="savePks">' + mi('save') + ' Simpan PKS</button></div>'
-      : (k ? '<dl class="kv"><dt>Para pihak</dt><dd>' + esc(k.para_pihak || '-') + '</dd><dt>Ruang lingkup</dt><dd>' + esc(k.ruang_lingkup || '-') + '</dd><dt>Masa berlaku</dt><dd>' + esc(k.masa_berlaku || '-') + '</dd><dt>Lapor Gubernur</dt><dd>' + (k.tgl_lapor_gubernur ? fmtD(k.tgl_lapor_gubernur) + ' · ' + esc(k.bukti_lapor || '') : '-') + '</dd></dl>' : '<span class="t-sub">-</span>')) + '</div>';
-  return baBox('Pemaparan', [6, 7]) + baBox('Hasil Penelaahan', [7, 8]) + pks;
+  const k = d.pks[0]; const kedit = can(['prl', 'uptd', 'kepala_dkp']) && [9, 10, 11].indexOf(p.tahap) > -1 && !(k && k.status === 'Ditandatangani');
+  const lapor = '<div class="row2"><div class="fld"><label>Tanggal lapor ke Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah</label><input type="date" class="in" id="pkLapor" value="' + esc(k && k.tgl_lapor_gubernur ? String(k.tgl_lapor_gubernur).substr(0, 10) : '') + '"></div><div class="fld"><label>Bukti pelaporan (nomor/uraian)</label><input class="in" id="pkBukti" value="' + esc(k ? k.bukti_lapor : '') + '"></div></div>';
+  const meta = '<div class="card"><h3>Data PKS ' + (k ? '<span class="chip ' + (k.status === 'Ditandatangani' ? 'c-ok' : 'c-draft') + '">' + esc(k.status) + '</span>' : '') + '</h3><p class="sub">' + (k ? esc(k.nomor) + (k.status === 'Ditandatangani' ? ' · Kode verifikasi: <b>' + esc(k.kode) + '</b>' : '') : 'Belum disusun') + '</p>' +
+    (kedit ? (p.tahap === 10 || S.me.peran === 'kepala_dkp' ? '' : '<div class="fld"><label>Para pihak</label><input class="in" id="pkPihak" value="' + esc(k ? k.para_pihak : '') + '"></div><div class="fld"><label>Ruang lingkup</label><textarea class="in" id="pkRuang">' + esc(k ? k.ruang_lingkup : '') + '</textarea></div><div class="fld"><label>Masa berlaku</label><input class="in" id="pkMasa" value="' + esc(k ? k.masa_berlaku : '') + '"></div>') +
+      (can(['kepala_dkp']) ? lapor : '') + '<div style="text-align:right"><button class="btn btn-p" data-act="savePks">' + mi('save') + ' Simpan data PKS</button></div>'
+      : (k ? '<dl class="kv"><dt>Para pihak</dt><dd>' + esc(k.para_pihak || '-') + '</dd><dt>Ruang lingkup</dt><dd>' + esc(k.ruang_lingkup || '-') + '</dd><dt>Masa berlaku</dt><dd>' + esc(k.masa_berlaku || '-') + '</dd><dt>Lapor ke Dinas Kelautan dan Perikanan Provinsi</dt><dd>' + (k.tgl_lapor_gubernur ? fmtD(k.tgl_lapor_gubernur) + ' · ' + esc(k.bukti_lapor || '') : '-') + '</dd></dl>' : '<span class="t-sub">-</span>')) + '</div>';
+  return '<div class="callout info" style="margin-bottom:16px">' + mi('info') + '<span>Berita Acara dan PKS ditandatangani secara offline. Unggah hasil pindainya di sini; dokumen yang bertanda tangan menjadi syarat untuk melanjutkan tahap.</span></div>' + TTD_SLOTS.map(slot).join('') + meta;
 }
 function tMonev(p, d) {
-  const can = p.tahap === 12 && p.status !== 'Selesai' && ['mitra', 'prl', 'uptd', 'admin'].indexOf(S.me.peran) > -1;
+  const can = p.tahap === 12 && p.status !== 'Selesai' && can(['mitra', 'prl', 'uptd']);
   const list = d.monev.map(function (m) { return '<div class="it" style="padding:10px 0;border-bottom:1px solid var(--line)"><b>' + esc(m.periode) + '</b> <span class="chip c-teal">' + esc(m.capaian_persen) + '%</span><div class="t-sub">' + esc(m.pelapor) + ' · ' + fmtD(m.dibuat) + '</div><div>' + esc(m.kendala || '') + '</div>' + (m.rekomendasi ? '<div class="t-sub">Rekomendasi: ' + esc(m.rekomendasi) + '</div>' : '') + '</div>'; }).join('') || '<div class="empty" style="padding:18px">Belum ada laporan.</div>';
   return '<div class="grid g-main"><div class="card"><h3>Laporan monitoring (Lampiran VIII)</h3><p class="sub">Terbaru di atas.</p>' + list + '</div>' + (can ? '<div class="card"><h3>Tambah laporan</h3><div class="fld"><label>Periode <i>*</i></label><input class="in" id="mvP" placeholder="mis. Triwulan I 2027"></div><div class="fld"><label>Target</label><input class="in" id="mvT"></div><div class="row2"><div class="fld"><label>Capaian (%)</label><input type="number" min="0" max="100" class="in" id="mvC"></div><div class="fld"><label>Realisasi biaya</label><input class="in" id="mvR"></div></div><div class="fld"><label>Kendala</label><textarea class="in" id="mvK"></textarea></div><div class="fld"><label>Rekomendasi</label><textarea class="in" id="mvRek"></textarea></div><button class="btn btn-p btn-block" data-act="saveMv">' + mi('add') + ' Kirim laporan</button></div>' : '') + '</div>';
 }
 function tRiwayat(p, d) {
   return '<div class="card"><h3>Jejak audit</h3><p class="sub">Setiap keputusan dicatat permanen.</p><div class="tl">' + (d.riwayat.map(function (r) { return '<div class="it ' + (/Tidak/.test(r.keputusan) ? 'bad' : '') + '"><b>' + esc(r.keputusan) + '</b> <span class="t-sub">(tahap ' + esc(r.dari) + ' → ' + esc(r.ke) + ')</span><small>' + esc(r.pelaku) + ' · ' + esc(PERAN_L(r.peran)) + ' · ' + fmtDT(r.waktu) + '</small>' + (r.catatan ? '<div class="note">' + esc(r.catatan) + '</div>' : '') + '</div>'; }).join('') || '<div class="empty">Belum ada riwayat.</div>') + '</div></div>';
 }
-function PERAN_L(r) { return { mitra: 'Mitra', prl: 'PRL', uptd: 'UPTD', kepala_dkp: 'Kepala DKP', admin: 'Admin' }[r] || r; }
+function PERAN_L(r) { return { mitra: 'Mitra', prl: 'PRL', uptd: 'UPTD', kepala_dkp: 'Kepala DKP', admin: 'Admin UPTD', superadmin: 'Super Admin' }[r] || r; }
 
 function jadwalTeks(j) { return esc(fmtD(j.tanggal)) + ', ' + esc(j.jam) + (j.jam_selesai ? '–' + esc(j.jam_selesai) : '') + ' WITA' + (j.tempat ? ' · ' + esc(j.tempat) : ''); }
 function tJadwal(p, d) {
-  const j = d.jadwal; const edit = ['prl', 'uptd', 'admin'].indexOf(S.me.peran) > -1 && p.tahap === 6 && FINAL.indexOf(p.status) === -1;
+  const j = d.jadwal; const edit = can(['prl', 'uptd']) && p.tahap === 6 && FINAL.indexOf(p.status) === -1;
   const tag = j ? '<span class="chip ' + (j.status === 'Dibatalkan' ? 'c-bad' : 'c-ok') + '">' + esc(j.status) + '</span>' : '';
   const view = j ? '<div class="callout ' + (j.status === 'Dibatalkan' ? 'bad' : 'ok') + '" style="margin:10px 0">' + mi('event') + '<span>' + jadwalTeks(j) + '</span></div><dl class="kv"><dt>Tempat</dt><dd>' + esc(j.tempat || '-') + '</dd><dt>Rapat daring</dt><dd>' + (j.tautan ? '<a href="' + esc(j.tautan) + '" target="_blank" rel="noopener noreferrer">' + esc(j.tautan) + '</a>' : '-') + '</dd><dt>Peserta</dt><dd>' + esc(j.peserta || '-') + '</dd><dt>Catatan</dt><dd>' + esc(j.catatan || '-') + '</dd><dt>Ditetapkan</dt><dd>' + esc(j.dibuat_oleh) + ' · ' + fmtDT(j.diubah) + '</dd></dl>' : '<div class="empty" style="padding:18px">' + mi('event_busy') + 'Jadwal pemaparan belum ditentukan.</div>';
   const form = edit ? '<h4 style="margin:16px 0 8px">' + (j && j.status !== 'Dibatalkan' ? 'Ubah jadwal' : 'Tentukan jadwal') + '</h4><div class="row2"><div class="fld"><label>Tanggal <i>*</i></label><input type="date" class="in" id="jdT" min="' + new Date().toISOString().slice(0, 10) + '" value="' + esc(j && j.status !== 'Dibatalkan' ? String(j.tanggal).substr(0, 10) : '') + '"></div><div class="fld"><label>Jam mulai (WITA) <i>*</i></label><input type="time" class="in" id="jdJ" value="' + esc(j ? j.jam : '') + '"></div></div><div class="row2"><div class="fld"><label>Jam selesai</label><input type="time" class="in" id="jdJ2" value="' + esc(j ? j.jam_selesai : '') + '"></div><div class="fld"><label>Tempat</label><input class="in" id="jdP" placeholder="mis. Ruang rapat DKP" value="' + esc(j ? j.tempat : '') + '"></div></div><div class="fld"><label>Tautan rapat daring (opsional bila tempat diisi)</label><input class="in" id="jdL" placeholder="https://meet.google.com/…" value="' + esc(j ? j.tautan : '') + '"></div><div class="fld"><label>Peserta / undangan</label><input class="in" id="jdS" placeholder="PRL, UPTD, mitra, tim teknis…" value="' + esc(j ? j.peserta : '') + '"></div><div class="fld"><label>Catatan untuk mitra</label><textarea class="in" id="jdC" placeholder="Bahan paparan, durasi, perlengkapan…">' + esc(j ? j.catatan : '') + '</textarea></div><div style="display:flex;gap:8px;justify-content:flex-end">' + (j && j.status !== 'Dibatalkan' ? '<button class="btn btn-o" data-act="batalJadwal">Batalkan jadwal</button>' : '') + '<button class="btn btn-p" data-act="saveJadwal">' + mi('event_available') + ' Simpan jadwal</button></div><p class="hint" style="margin-top:8px">Mitra dan staf terkait mendapat notifikasi. Jadwal wajib ada sebelum pemaparan ditandai selesai.</p>' : '';
