@@ -11,13 +11,22 @@ function showAuth() {
 function authCfg() { const c = (S.master && S.master.config) || {}; return { gid: c.google_client_id || '', pw: c.password_login !== false }; }
 function googleOnlyUI() { const a = authCfg(); return !!a.gid && !a.pw; }
 function applyAuthMode() {
-  const a = authCfg(); const g = !!a.gid; const seg = document.querySelector('.auth-box .seg');
-  $('googleBox').hidden = !g; $('formProfil').hidden = true; $('gErr').textContent = '';
-  if (!g) { seg.hidden = false; return; }
-  seg.hidden = true; $('formReg').hidden = true; $('formLogin').hidden = !a.pw; $('gOr').hidden = !a.pw;
   const sel = $('pfJenis'); const list = S.master ? S.master.jenis.map(function (j) { return [j.kode, j.nama]; }) : JENIS_FALLBACK;
   sel.innerHTML = '<option value="">Pilih jenis mitra…</option>' + list.map(function (j) { return '<option value="' + esc(j[0]) + '">' + esc(j[1]) + '</option>'; }).join('');
-  gButton($('gBtn'), onGoogleLogin, { text: 'signin_with', width: 340 });
+  document.querySelector('.auth-box .seg').hidden = false; showAuthTab('login');
+}
+/** Tab Masuk / Daftar Mitra — tersedia pada mode Google maupun kata sandi. */
+function showAuthTab(v) {
+  const a = authCfg(), g = !!a.gid, l = v !== 'register'; S._authTab = v;
+  $('tabLogin').classList.toggle('on', l); $('tabReg').classList.toggle('on', !l);
+  $('formProfil').hidden = true; $('gErr').textContent = ''; $('gErrReg').textContent = ''; $('lgErr').textContent = ''; $('rgErr').textContent = '';
+  Array.prototype.forEach.call($('formReg').querySelectorAll(':scope > h2, :scope > p'), function (e) { e.hidden = g; });
+  if (!g) { $('googleBox').hidden = true; $('googleRegBox').hidden = true; $('formLogin').hidden = !l; $('formReg').hidden = l; return; }
+  $('googleBox').hidden = !l; $('googleRegBox').hidden = l;
+  $('formLogin').hidden = !(l && a.pw); $('gOr').hidden = !(l && a.pw);
+  $('formReg').hidden = !(!l && a.pw); $('gOrReg').hidden = !(!l && a.pw);
+  S._gErrId = l ? 'gErr' : 'gErrReg';
+  gButton(l ? $('gBtn') : $('gBtnReg'), onGoogleLogin, { text: l ? 'signin_with' : 'signup_with', width: 340 });
 }
 function loadGIS(cb) {
   if (window.google && google.accounts && google.accounts.id) return cb();
@@ -37,12 +46,12 @@ function gButton(el, cb, opt) {
   });
 }
 function onGoogleLogin(cred) {
-  $('gErr').textContent = ''; const b = $('gBtn'); b.style.opacity = '.5'; b.style.pointerEvents = 'none';
+  const eid = S._gErrId || 'gErr'; $(eid).textContent = ''; const b = eid === 'gErrReg' ? $('gBtnReg') : $('gBtn'); b.style.opacity = '.5'; b.style.pointerEvents = 'none';
   api('login_google', { credential: cred }).then(function (r) { if (r.perlu_daftar) showProfil(r, cred); else afterAuth(r); })
-    .catch(function (er) { $('gErr').textContent = er.message; }).then(function () { b.style.opacity = ''; b.style.pointerEvents = ''; });
+    .catch(function (er) { $(eid).textContent = er.message; }).then(function () { b.style.opacity = ''; b.style.pointerEvents = ''; });
 }
 function showProfil(r, cred) {
-  S._gcredReg = cred; $('googleBox').hidden = true; $('formLogin').hidden = true; $('formProfil').hidden = false; $('pfErr').textContent = '';
+  S._gcredReg = cred; $('googleBox').hidden = true; $('googleRegBox').hidden = true; $('formReg').hidden = true; $('formLogin').hidden = true; $('formProfil').hidden = false; $('pfErr').textContent = '';
   $('pfEmail').value = r.email; $('pfNama').value = r.nama || ''; $('pfLembaga').focus();
 }
 /** Konfirmasi pejabat: kata sandi (mode lama) atau verifikasi ulang dengan akun Google (mode Google). */
@@ -64,6 +73,19 @@ function afterAuth(r) {
   S.token = r.token; LS.set('sm_tok', r.token); hydrate(r); persist(); showApp(); S.stack = []; S.view = '';
   navigateTo('dashboard', {}, { replace: true });
 }
+/** Setelah mendaftar: masuk ke aplikasi lalu arahkan mitra ke WhatsApp Super Admin (bila nomornya diisi). */
+function afterRegister(r, d) {
+  const c = (S.master && S.master.config) || {}; const no = String(c.wa_superadmin || '').replace(/\D/g, '');
+  const jn = ((S.master && S.master.jenis) || []).filter(function (j) { return j.kode === d.jenis_mitra; })[0];
+  const pesan = 'Halo Super Admin SI-MITRA Konservasi Sulteng, saya telah mendaftar sebagai mitra.\n\nLembaga: ' + d.lembaga + '\nJenis mitra: ' + (jn ? jn.nama : d.jenis_mitra) + '\nPenanggung jawab: ' + d.nama + '\nEmail: ' + (d.email || (r.me && r.me.email) || '') + '\nTelepon/WA: ' + d.telepon + '\n\nMohon dibantu untuk proses selanjutnya. Terima kasih.';
+  afterAuth(r); if (!no) return;
+  const link = 'https://wa.me/' + no + '?text=' + encodeURIComponent(pesan);
+  setTimeout(function () {
+    let w = null; try { w = window.open(link, '_blank'); } catch (e) {}
+    if (w) { toast('ok', 'Pendaftaran berhasil. WhatsApp Super Admin dibuka di tab baru.'); return; }
+    modal({ title: 'Pendaftaran berhasil', body: '<p>Akun mitra Anda sudah dibuat. Langkah berikutnya, hubungi <b>Super Admin</b> melalui WhatsApp agar pendaftaran Anda dibantu.</p>', ok: 'Buka WhatsApp Super Admin', hideCancel: false, onOk: function () { window.open(link, '_blank'); } });
+  }, 400);
+}
 function pwScore(p) { let s = 0; if (p.length >= 8) s++; if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++; if (/\d/.test(p)) s++; if (/[^A-Za-z0-9]/.test(p) || p.length >= 12) s++; return s; }
 function bindAuth() {
   $('formLogin').addEventListener('submit', function (e) {
@@ -78,7 +100,7 @@ function bindAuth() {
     const d = { credential: S._gcredReg, lembaga: $('pfLembaga').value, jenis_mitra: $('pfJenis').value, nama: $('pfNama').value, jabatan: $('pfJab').value, telepon: $('pfTelp').value };
     if (!d.lembaga.trim() || !d.nama.trim() || !d.jenis_mitra || !d.telepon.trim()) { $('pfErr').textContent = 'Lengkapi semua kolom bertanda *.'; return; }
     const b = $('btnProfil'); loadingBtn(b, true);
-    api('register_google', d).then(afterAuth).catch(function (er) { $('pfErr').textContent = er.message; }).then(function () { loadingBtn(b, false); });
+    api('register_google', d).then(function (r) { afterRegister(r, d); }).catch(function (er) { $('pfErr').textContent = er.message; }).then(function () { loadingBtn(b, false); });
   });
   $('formReg').addEventListener('submit', function (e) {
     e.preventDefault(); $('rgErr').textContent = '';
@@ -86,7 +108,7 @@ function bindAuth() {
     if (!d.lembaga.trim() || !d.nama.trim() || !d.jenis_mitra || !d.email.trim() || !d.telepon.trim()) { $('rgErr').textContent = 'Lengkapi semua kolom bertanda *.'; return; }
     if (d.password.length < 8) { $('rgErr').textContent = 'Kata sandi minimal 8 karakter.'; return; }
     const b = $('btnReg'); loadingBtn(b, true);
-    api('register', d).then(afterAuth).catch(function (er) { $('rgErr').textContent = er.message; }).then(function () { loadingBtn(b, false); });
+    api('register', d).then(function (r) { afterRegister(r, d); }).catch(function (er) { $('rgErr').textContent = er.message; }).then(function () { loadingBtn(b, false); });
   });
   $('rgPw').addEventListener('input', function () {
     const s = pwScore(this.value); const m = $('pwMeter'); m.style.width = (s * 25) + '%'; m.style.background = ['var(--red)', 'var(--red)', 'var(--amber)', 'var(--teal)', 'var(--green)'][s];

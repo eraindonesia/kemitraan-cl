@@ -235,3 +235,20 @@ function tJadwal(p, d) {
   const form = edit ? '<h4 style="margin:16px 0 8px">' + (j && j.status !== 'Dibatalkan' ? 'Ubah jadwal' : 'Tentukan jadwal') + '</h4><div class="row2"><div class="fld"><label>Tanggal <i>*</i></label><input type="date" class="in" id="jdT" min="' + new Date().toISOString().slice(0, 10) + '" value="' + esc(j && j.status !== 'Dibatalkan' ? String(j.tanggal).substr(0, 10) : '') + '"></div><div class="fld"><label>Jam mulai (WITA) <i>*</i></label><input type="time" class="in" id="jdJ" value="' + esc(j ? j.jam : '') + '"></div></div><div class="row2"><div class="fld"><label>Jam selesai</label><input type="time" class="in" id="jdJ2" value="' + esc(j ? j.jam_selesai : '') + '"></div><div class="fld"><label>Tempat</label><input class="in" id="jdP" placeholder="mis. Ruang rapat DKP" value="' + esc(j ? j.tempat : '') + '"></div></div><div class="fld"><label>Tautan rapat daring (opsional bila tempat diisi)</label><input class="in" id="jdL" placeholder="https://meet.google.com/…" value="' + esc(j ? j.tautan : '') + '"></div><div class="fld"><label>Peserta / undangan</label><input class="in" id="jdS" placeholder="PRL, UPTD, mitra, tim teknis…" value="' + esc(j ? j.peserta : '') + '"></div><div class="fld"><label>Catatan untuk mitra</label><textarea class="in" id="jdC" placeholder="Bahan paparan, durasi, perlengkapan…">' + esc(j ? j.catatan : '') + '</textarea></div><div style="display:flex;gap:8px;justify-content:flex-end">' + (j && j.status !== 'Dibatalkan' ? '<button class="btn btn-o" data-act="batalJadwal">Batalkan jadwal</button>' : '') + '<button class="btn btn-p" data-act="saveJadwal">' + mi('event_available') + ' Simpan jadwal</button></div><p class="hint" style="margin-top:8px">Mitra dan staf terkait mendapat notifikasi. Jadwal wajib ada sebelum pemaparan ditandai selesai.</p>' : '';
   return '<div class="card"><h3>Jadwal pemaparan program ' + tag + '</h3><p class="sub">Tahap 6 — presentasi program kepada tim PRL dan UPTD</p>' + view + form + '</div>';
 }
+
+/** Hasil pengiriman WhatsApp setelah jadwal ditetapkan/dibatalkan: otomatis (token Fonnte) atau tombol sekali-klik (wa.me). */
+function waHasil(w) {
+  if (!w || !w.penerima || !w.penerima.length) return;
+  const oto = w.mode === 'otomatis'; const ok = w.penerima.filter(function (x) { return x.terkirim; }).length;
+  const sisa = w.penerima.filter(function (x) { return !x.terkirim; });
+  if (oto && !sisa.length) { toast('ok', 'WhatsApp terkirim ke ' + ok + ' penerima.'); return; }
+  const rows = w.penerima.map(function (x) {
+    let st;
+    if (x.terkirim) st = '<span class="chip c-ok">Terkirim</span>';
+    else if (!x.nomor) st = '<span class="chip c-bad">Nomor belum diisi</span>';
+    else st = '<a class="btn btn-p btn-s" target="_blank" rel="noopener" href="' + esc(x.link) + '">Kirim lewat WhatsApp</a>';
+    return '<div class="wa-row"><div><b>' + esc(x.nama) + '</b><small>' + esc(x.peran_nama) + (x.nomor ? ' · +' + esc(x.nomor) : '') + (x.galat ? ' · ' + esc(x.galat) : '') + '</small></div>' + st + '</div>';
+  }).join('');
+  modal({ title: oto ? 'WhatsApp: ' + ok + ' terkirim, ' + sisa.length + ' perlu tindakan' : 'Kirim jadwal lewat WhatsApp', sub: oto ? '' : 'Pengiriman otomatis belum diaktifkan. Klik tombol di tiap penerima; pesan sudah terisi.',
+    body: '<div class="wa-list">' + rows + '</div><p class="hint" style="margin-top:10px">Nomor diambil dari data pengguna. Admin UPTD yang nomornya kosong dapat dilengkapi di Manajemen Pengguna.</p>', ok: 'Selesai', hideCancel: true });
+}
