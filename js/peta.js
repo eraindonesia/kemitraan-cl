@@ -349,14 +349,16 @@ const MapKit = (function () {
       };
       q('txt').focus();
     }
-    host.addEventListener('click', function (e) {
+    if (host._mkClick) host.removeEventListener('click', host._mkClick); // cegah pemasangan ganda pada elemen yang sama
+    host._mkClick = function (e) {
       const b = e.target.closest('[data-m]'); if (!b) return; const a = b.dataset.m;
       if (a === 'draw') { if (complex) { toast('bad', 'Area hasil impor tidak dapat digambar ulang. Hapus dulu atau impor ulang.'); return; } setDrawing(!drawing); }
       else if (a === 'undo') { pts.pop(); render(); changed(); }
       else if (a === 'clear') { pts = []; complex = null; setDrawing(false); render(); changed(); }
       else if (a === 'import') doImport();
       else if (a === 'locate') { map.locate({ setView: true, maxZoom: 16 }); }
-    });
+    };
+    host.addEventListener('click', host._mkClick);
     map.on('locationerror', function () { toast('bad', 'Lokasi tidak tersedia. Izinkan akses lokasi pada browser.'); });
     setBatas(opts.batas); render(true); if (!pts.length && !complex && opts.fokus) map.setView(opts.fokus, 10);
     else if (!pts.length && !complex && opts.batas && opts.kawasan) { const b = opts.batas.filter(function (x) { return x.kawasan === opts.kawasan && x.geojson; })[0]; if (b) map.fitBounds(boundsOf(parse(b.geojson)).pad(0.1)); }

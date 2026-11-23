@@ -99,7 +99,7 @@ function modal(o) {
   document.addEventListener('keydown', escClose);
   const f = root.querySelector('input,select,textarea'); if (f) setTimeout(function () { f.focus(); }, 30);
   if (o.ok) $('mOk').onclick = function () {
-    const btn = $('mOk'); const r = o.onOk(root);
+    const btn = $('mOk'); if (!o.onOk) { closeModal(); return; } const r = o.onOk(root);
     if (r && r.then) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span>'; r.then(function (ok) { if (ok !== false) closeModal(); else { btn.disabled = false; btn.textContent = o.ok; } }).catch(function (e) { $('mErr').textContent = e.message; btn.disabled = false; btn.textContent = o.ok; }); }
   };
   return root;
@@ -126,7 +126,7 @@ function openNav() { $('sidebar').classList.add('open'); $('scrim').classList.ad
 function closeNav() { $('sidebar').classList.remove('open'); $('scrim').classList.remove('show'); }
 function closePop(keep) { ['notifPop', 'profPop'].forEach(function (id) { const p = $(id); if (p && id !== keep) p.hidden = true; }); }
 
-function pkey(p) { p = p || {}; return [p.aksi ? 1 : 0, p.tahap || '', p.t1 || ''].join('|'); }
+function pkey(p) { p = p || {}; return [p.aksi ? 1 : 0, p.tahap || '', p.t1 || '', (p.ts || []).join(',')].join('|'); }
 function navItems() {
   const r = S.me.peran, n = S.daftar.filter(needsAction).length, staff = r !== 'mitra'; const a = [];
   a.push({ grp: 'Ringkasan' });
@@ -135,9 +135,10 @@ function navItems() {
   a.push({ grp: 'Pengajuan' });
   a.push({ id: 'daftar', ic: 'inbox', t: r === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan', p: {} });
   if (r === 'mitra') a.push({ id: 'daftar', ic: 'pending_actions', t: 'Perlu Dilengkapi', p: { aksi: 1 }, badge: n });
-  else a.push({ id: 'daftar', ic: 'fact_check', t: 'Telaah & Verifikasi', p: { t1: 3, t2: 8 }, badge: n });
+  else a.push({ id: 'daftar', ic: 'fact_check', t: 'Telaah & Verifikasi', p: { ts: r === 'prl' ? [4, 5, 6, 7, 8] : (r === 'admin' || r === 'uptd') ? [2, 3, 9, 10, 11] : [2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }, badge: n });
   a.push({ id: 'dokumen', ic: 'description', t: 'Berita Acara & PKS' });
   a.push({ id: 'daftar', ic: 'monitoring', t: 'Monitoring & Evaluasi', p: { tahap: '12' } });
+  a.push({ id: 'pelaporan', ic: 'summarize', t: 'Pelaporan Mitra' });
   a.push({ grp: 'Laporan & Verifikasi' });
   a.push({ id: 'statistik', ic: 'bar_chart', t: 'Laporan & Statistik' });
   a.push({ id: 'verifikasi', ic: 'verified_user', t: 'Verifikasi Dokumen' });
@@ -160,7 +161,7 @@ function setTitle(t) { $('pageTitle').textContent = t; document.title = t + ' ·
 function renderView() {
   if (S.view === 'form' && !(S.params && S.params.id) && S.me && S.me.peran !== 'mitra') { S.view = 'dashboard'; S.params = {}; }
   MapKit.disposeAll();
-  const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun, dokumen: vDokumen, statistik: vStatistik, peta: vPeta, verifikasi: vVerifikasi };
+  const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun, dokumen: vDokumen, statistik: vStatistik, pelaporan: vPelaporan, peta: vPeta, verifikasi: vVerifikasi };
   (V[S.view] || vDashboard)();
 }
 function setView(html) { $('view').innerHTML = html; }

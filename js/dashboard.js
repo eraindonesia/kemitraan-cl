@@ -130,6 +130,7 @@ function listData() {
   const f = S.f; const q = f.q.toLowerCase().trim();
   let a = S.daftar.filter(function (p) {
     if (S.params.aksi && !needsAction(p)) return false;
+    if (S.params.ts && S.params.ts.indexOf(p.tahap) === -1) return false;
     if (S.params.t1 && (p.tahap < S.params.t1 || p.tahap > S.params.t2)) return false;
     if (q && (p.nomor + ' ' + p.judul + ' ' + p.lembaga + ' ' + p.kawasan).toLowerCase().indexOf(q) === -1) return false;
     if (f.status && groupOf(p) !== f.status) return false;
@@ -142,7 +143,7 @@ function listData() {
 }
 function vDaftar() {
   if (!S._keepF) applyParams(); S._keepF = false;
-  const title = S.params.aksi ? (S.me.peran === 'mitra' ? 'Perlu Dilengkapi' : 'Perlu Tindakan') : S.params.t1 ? 'Telaah & Verifikasi' : S.params.tahap === '12' ? 'Monitoring & Evaluasi' : (S.me.peran === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan'); setTitle(title);
+  const title = S.params.aksi ? (S.me.peran === 'mitra' ? 'Perlu Dilengkapi' : 'Perlu Tindakan') : (S.params.t1 || S.params.ts) ? 'Telaah & Verifikasi' : S.params.tahap === '12' ? 'Monitoring & Evaluasi' : (S.me.peran === 'mitra' ? 'Pengajuan Saya' : 'Daftar Pengajuan'); setTitle(title);
   const kaw = S.master.kawasan.map(function (k) { return '<option value="' + esc(k.nama) + '"' + (S.f.kawasan === k.nama ? ' selected' : '') + '>' + esc(k.nama) + '</option>'; }).join('');
   const grups = ['Berjalan', 'Perlu dilengkapi', 'Pelaksanaan', 'Selesai', 'Tidak dilanjutkan'];
   setView('<div class="ph"><div><h2>' + esc(title) + '</h2><p id="listCount"></p></div><div class="sp"></div>' + ((S.me.peran === 'mitra') ? '<button class="btn btn-p" data-act="newForm">' + mi('add') + ' Ajukan Kemitraan</button>' : '') + '</div>' +

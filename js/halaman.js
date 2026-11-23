@@ -108,6 +108,7 @@ function vDashboard() {
     '<div class="g3x"><div class="card"><h3>Sebaran jenis calon mitra</h3><p class="sub">Komposisi pemohon aktif</p><div class="donut">' + donutSvg(jparts, D.length) + '<ul class="leg" style="flex:1;min-width:150px">' + jleg + '</ul></div></div>' +
     '<div class="card bars"><h3>Sebaran kawasan konservasi</h3><p class="sub">Jumlah usulan per kawasan</p>' + kbars + '</div>' +
     '<div class="card gauge"><h3 style="text-align:left">Capaian target monev</h3><p class="sub" style="text-align:left">Rata-rata ' + mon.length + ' laporan monitoring</p>' + gauge(avg === null ? 0 : avg) + '<div class="gstats"><div><small>Target</small><b>100%</b></div><div class="hl"><small>Terealisasi</small><b>' + (avg === null ? '—' : avg.toFixed(1) + '%') + '</b></div><div><small>Selisih</small><b>' + (avg === null ? '—' : (100 - avg).toFixed(1) + '%') + '</b></div></div></div></div>' +
+    pelaporanCard(mon) +
     '<div class="g-map"><div class="card"><div class="card-h"><div><h3>Peta zonasi kemitraan aktif</h3><p class="sub">Batas kawasan (garis putus-putus) dan area pengelolaan usulan.</p></div><div class="sp"></div><a class="lnk" data-act="goPeta">Buka peta penuh ›</a></div><div class="mapbox mid" id="dashMap"></div><div class="map-legend" id="dashLeg"></div></div>' +
     '<div class="card"><div class="card-h"><div class="ic" style="background:var(--coral-l);color:var(--coral)">' + mi('notifications_active') + '</div><div><h3>Perlu tindakan</h3></div><div class="sp"></div><span class="tag tg-w">' + need.length + ' prioritas</span></div>' + nlist + (need.length ? '<button class="btn btn-o btn-block btn-s" data-act="goDaftar" data-p=\'{"aksi":1}\'>Lihat semua (' + need.length + ')</button>' : '') + '</div></div>' +
     '<div class="card"><div class="card-h"><div class="ic" style="background:var(--bg);color:var(--tx-2)">' + mi('history') + '</div><div><h3>Linimasa riwayat & progres sistem</h3></div><div class="sp"></div><a class="lnk" data-act="goDaftar" data-p="{}">Lihat pengajuan ›</a></div><div class="tl-h">' + tl + '</div></div>' +
@@ -145,6 +146,27 @@ function vDokumen() {
   api('dokumen_list').then(function (r) { S.dok = r; draw(); }).catch(function (e) { if (!S.dok) $('dkBody').innerHTML = '<div class="callout bad">' + mi('error') + '<span>' + esc(e.message) + '</span></div>'; });
 }
 
+/* ----------------------------- Pelaporan Mitra ----------------------------- */
+function pelaporanRows() { return S.monev.map(function (m) { return { m: m, p: pById(m.id_pengajuan) }; }).filter(function (x) { return x.p; }).sort(function (a, b) { return a.m.dibuat < b.m.dibuat ? 1 : -1; }); }
+function vPelaporan() {
+  setTitle('Pelaporan Mitra'); const all = pelaporanRows(); const q = (S.pelQ || '').toLowerCase().trim();
+  const a = all.filter(function (x) { return !q || (x.p.nomor + ' ' + x.p.judul + ' ' + x.p.lembaga + ' ' + x.p.kawasan + ' ' + x.m.periode).toLowerCase().indexOf(q) > -1; });
+  const avg = all.length ? all.reduce(function (s, x) { return s + Number(x.m.capaian_persen || 0); }, 0) / all.length : null;
+  const adaPdf = all.filter(function (x) { return x.m.file; }).length;
+  const rows = a.map(function (x) {
+    return '<tr data-act="bukaMonev" data-id="' + esc(x.p.id) + '"><td class="t-b">' + esc(x.m.periode) + '</td><td><b>' + esc(x.p.judul) + '</b><div class="t-sub">' + esc(x.p.nomor) + ' · ' + esc(x.p.lembaga) + '</div></td><td>' + esc(x.p.kawasan) + '</td><td><span class="chip c-teal">' + esc(x.m.capaian_persen) + '%</span></td><td>' + esc(x.m.pelapor) + '<div class="t-sub">' + fmtD(x.m.dibuat) + '</div></td><td data-stop="1">' + (x.m.file ? fileChip(x.m.file, false) : '<span class="t-sub">Tanpa PDF</span>') + '</td></tr>';
+  }).join('');
+  setView('<div class="ph"><div><h2>Pelaporan Mitra</h2><p>Laporan monitoring & evaluasi kegiatan mitra beserta berkas PDF-nya.</p></div><div class="sp"></div><button class="btn btn-o" data-act="exportMonev">' + mi('download') + ' Ekspor (CSV)</button></div>' +
+    '<div class="kpis"><div class="kpi2"><div class="lb"><span>Total laporan</span></div><div class="vl">' + all.length + '</div></div><div class="kpi2"><div class="lb"><span>Rata-rata capaian</span></div><div class="vl">' + (avg === null ? '–' : numID(avg, 1) + '%') + '</div></div><div class="kpi2"><div class="lb"><span>Dengan berkas PDF</span></div><div class="vl">' + adaPdf + '</div></div></div>' +
+    '<div class="card" style="margin:14px 0;padding:14px"><input id="pelQ" class="in" type="search" placeholder="Cari program, mitra, kawasan, periode…" aria-label="Cari" value="' + esc(S.pelQ || '') + '"></div>' +
+    '<div class="card">' + (a.length ? '<div class="tbl-wrap"><table><thead><tr><th>Periode</th><th>Program / Mitra</th><th>Kawasan</th><th>Capaian</th><th>Pelapor</th><th>Berkas</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<div class="empty" style="padding:24px">' + (all.length ? 'Tidak ada laporan yang cocok.' : 'Belum ada laporan monev. Laporan diisi pada tahap 12 (pelaksanaan) oleh Admin UPTD atau mitra.') + '</div>') + '</div>');
+  const qi = $('pelQ'); if (qi) qi.addEventListener('input', debounce(function () { S.pelQ = this.value; const pos = this.selectionStart; vPelaporan(); const n = $('pelQ'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } }, 150));
+}
+function pelaporanCard(mon) {
+  const last = mon.slice().sort(function (a, b) { return a.dibuat < b.dibuat ? 1 : -1; }).slice(0, 5);
+  const items = last.map(function (m) { const p = pById(m.id_pengajuan); if (!p) return ''; return '<div class="it" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>' + esc(p.judul) + '</b><div class="t-sub">' + esc(p.lembaga) + ' · ' + esc(m.periode) + ' · ' + fmtD(m.dibuat) + '</div></div><span class="chip c-teal">' + esc(m.capaian_persen) + '%</span>' + (m.file ? '<span data-stop="1">' + fileChip(m.file, false) + '</span>' : '') + '</div>'; }).join('');
+  return '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('summarize') + '</div><div><h3>Pelaporan Mitra</h3><p class="sub">' + mon.length + ' laporan monitoring & evaluasi · 5 terbaru</p></div><div class="sp"></div><button class="btn btn-o btn-s" data-act="goPelaporan">Lihat semua</button></div>' + (items || '<div class="empty" style="padding:16px">Belum ada laporan monev.</div>') + '</div>';
+}
 /* ----------------------------- Laporan & Statistik ----------------------------- */
 function vStatistik() {
   setTitle('Laporan & Statistik'); const D = S.daftar.filter(function (p) { return !p._pending; });
@@ -154,89 +176,8 @@ function vStatistik() {
   D.forEach(function (p) { const d = new Date(p.dibuat); months.forEach(function (m) { if (m.y === d.getFullYear() && m.m === d.getMonth()) m.n++; }); });
   const mxm = Math.max(1, Math.max.apply(null, months.map(function (m) { return m.n; })));
   const chart = '<div class="bar-chart" role="img" aria-label="Pengajuan per bulan">' + months.map(function (m) { return '<div class="b"><em>' + (m.n || '') + '</em><i style="height:' + (m.n / mxm * 100) + '%"></i><span>' + m.l + '</span></div>'; }).join('') + '</div>';
-  const jn = {}; D.forEach(function (p) { jn[p.jenis_mitra] = (jn[p.jenis_mitra] || 0) + 1; });
-  let jk = Object.keys(jn).sort(function (a, b) { return jn[b] - jn[a]; }); const jparts = []; let lain = 0;
-  jk.forEach(function (k, i) { if (i < 4) jparts.push({ nm: jenisNama(k), n: jn[k], c: DONUT[i] }); else lain += jn[k]; }); if (lain) jparts.push({ nm: 'Lainnya', n: lain, c: DONUT[4] });
-  const jleg = jparts.map(function (p) { return '<li><i style="background:' + p.c + '"></i><span title="' + esc(p.nm) + '">' + esc(p.nm) + '</span><b>' + Math.round(p.n / Math.max(1, D.length) * 100) + '% (' + p.n + ')</b></li>'; }).join('') || '<li style="color:var(--tx-3)">Belum ada data.</li>';
-  // sebaran kawasan
-  const kw = {}; D.forEach(function (p) { kw[p.kawasan] = (kw[p.kawasan] || 0) + 1; }); const kk = Object.keys(kw).sort(function (a, b) { return kw[b] - kw[a]; }); const mx = Math.max(1, kw[kk[0]] || 1);
-  const kbars = kk.length ? kk.map(function (k) { return '<div class="brow"><span title="' + esc(k) + '">' + esc(k) + '</span><div class="bt"><i style="width:' + (kw[k] / mx * 100) + '%"></i></div><b>' + kw[k] + '</b></div>'; }).join('') : '<div class="empty">' + mi('bar_chart') + 'Belum ada data kawasan.</div>';
-  // ringkasan anggaran (terpisah dari kartu tahapan)
-  const sumB2 = function (l) { return l.reduce(function (a, p) { return a + (Number(p.biaya) || 0); }, 0); };
-  const totA = sumB2(D); const nA = D.filter(function (p) { return Number(p.biaya) > 0; }).length;
-  const perKaw = {}; D.forEach(function (p) { perKaw[p.kawasan] = (perKaw[p.kawasan] || 0) + (Number(p.biaya) || 0); });
-  const kawA = Object.keys(perKaw).sort(function (a, b) { return perKaw[b] - perKaw[a]; }).slice(0, 5); const mxK = Math.max(1, perKaw[kawA[0]] || 1);
-  const anggaran = '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('payments') + '</div><div><h3>Ringkasan anggaran</h3><p class="sub">Rencana anggaran seluruh usulan pada filter ini.</p></div></div>' +
-    '<div class="angg-grid"><div class="kpi-a"><small>Total rencana anggaran</small><b>' + rpBig(totA) + '</b></div><div class="kpi-a"><small>Usulan beranggaran</small><b>' + nA + ' / ' + D.length + '</b></div><div class="kpi-a"><small>Rata-rata per usulan</small><b>' + rpBig(nA ? totA / nA : 0) + '</b></div></div>' +
-    '<div style="margin-top:16px"><div class="bars"><h4 style="margin-bottom:8px">Per kawasan (5 teratas)</h4>' + (kawA.length ? kawA.map(function (k) { return '<div class="brow"><span title="' + esc(k) + '">' + esc(k) + '</span><div class="bt"><i style="width:' + (perKaw[k] / mxK * 100) + '%"></i></div><b>' + rpBig(perKaw[k]) + '</b></div>'; }).join('') : '<div class="empty">Belum ada data.</div>') + '</div></div></div>';
-  // perlu tindakan
-  const need = D.filter(needsAction).sort(function (a, b) { return a.diubah > b.diubah ? 1 : -1; });
-  const nlist = need.slice(0, 4).map(function (p) { return '<button class="act" data-act="open" data-id="' + esc(p.id) + '"><div class="r"><span>' + mi('schedule', 'font-size:14px') + ' Menunggu ' + waitTxt(p.diubah) + '</span><span class="tag tg-b">Tahap ' + p.tahap + '</span></div><div class="tt"><span>' + esc(p.lembaga) + '</span><span class="cta">' + esc(CTA[p.tahap] || 'Buka') + '</span></div><p>' + esc(stageName(p.tahap)) + ' — ' + esc(p.judul) + '</p><div class="r" style="margin-top:4px"><span>' + esc(p.kawasan) + '</span><span>' + esc(p.nomor) + '</span></div></button>'; }).join('') || '<div class="empty">' + mi('task_alt') + 'Tidak ada tindakan tertunda.</div>';
-  // linimasa
-  const IC = { 'Dibuat': 'note_add', 'Kirim': 'send', 'Kirim Ulang': 'send', 'Disposisi': 'reply', 'Lengkap': 'fact_check', 'Tidak Lengkap': 'edit_note', 'Disepakati': 'handshake', 'Tidak Disepakati': 'block' };
-  const tl = S.timeline.filter(function (r) { return ids[r.id_pengajuan]; }).slice(0, 5).map(function (r) { const p = pById(r.id_pengajuan) || {}; return '<div class="tl-c"><div class="tp"><i>' + mi(IC[r.keputusan] || 'task_alt', 'font-size:16px') + '</i><span>' + esc(r.keputusan) + '</span></div><b>' + esc(p.lembaga || '') + '</b><p>' + esc(r.catatan || (p.nomor + ' — ' + (p.judul || ''))) + '</p><small>' + esc(r.pelaku) + ' · ' + ago(r.waktu) + '</small></div>'; }).join('') || '<div class="empty" style="grid-column:1/-1">' + mi('history') + 'Belum ada aktivitas.</div>';
-  const per = [['all', 'Semua waktu'], ['30', '30 hari terakhir'], ['90', '90 hari terakhir'], ['thn', 'Tahun ini'], ['thnlalu', 'Tahun lalu']];
-  const sub = S.me.peran === 'mitra' ? 'Pantau perkembangan usulan kemitraan Anda dari koordinasi awal hingga monitoring dan evaluasi.' : 'Berikut ringkasan siklus kemitraan pengelolaan kawasan konservasi perairan Sulawesi Tengah hari ini.';
-  const canNew = S.me.peran === 'mitra';
-  const onboard = (S.daftar.length || S.daftar._loading) ? '' : (canNew
-    ? '<div class="onboard"><div><h3>Mulai pengajuan kemitraan pertama Anda</h3><p>Belum ada usulan. Ajukan kemitraan pengelolaan kawasan konservasi dalam tiga langkah singkat.</p><ol><li><i>1</i>Isi data lembaga &amp; usulan</li><li><i>2</i>Tandai lokasi di peta</li><li><i>3</i>Kirim &amp; pantau 12 tahap</li></ol></div><button class="btn btn-p" data-act="newForm">' + mi('add_circle') + ' Ajukan usulan</button></div>'
-    : '<div class="onboard"><div><h3>Belum ada usulan masuk</h3><p>Usulan kemitraan dari mitra akan muncul di sini beserta tahapan, area peta, dan tindakan yang menunggu Anda.</p></div></div>');
-  setView('<div class="hero"><div><h2>Selamat datang, ' + esc(S.me.nama) + '! 👋</h2><p>' + sub + '</p></div><div class="sp"></div><div class="ctl">' +
-    '<label class="sel">' + mi('date_range', 'font-size:16px') + '<select data-chg="dashFilter" data-k="periode" aria-label="Periode">' + per.map(function (x) { return '<option value="' + x[0] + '"' + (S.dash.periode === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
-    '<label class="sel">' + mi('tune', 'font-size:16px') + '<select data-chg="dashFilter" data-k="kawasan" aria-label="Kawasan"><option value="">Semua kawasan (' + S.master.kawasan.length + ')</option>' + S.master.kawasan.map(function (k) { return '<option' + (S.dash.kawasan === k.nama ? ' selected' : '') + ' value="' + esc(k.nama) + '">' + esc(k.nama) + '</option>'; }).join('') + '</select></label>' +
-    '<button class="btn btn-p" data-act="exportRekap">' + mi('download') + ' Ekspor rekap</button></div></div>' + onboard + kpis +
-    '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('account_tree') + '</div><div><h3>Alur 12 tahapan kemitraan konservasi</h3><p class="sub">Distribusi berkas permohonan kemitraan per fase tindak lanjut.</p></div><div class="sp"></div><a class="lnk" data-act="goDaftar" data-p="{}">Lihat seluruh pipeline ›</a></div>' + phases + '</div>' + anggaran +
-    '<div class="g3x"><div class="card"><h3>Sebaran jenis calon mitra</h3><p class="sub">Komposisi pemohon aktif</p><div class="donut">' + donutSvg(jparts, D.length) + '<ul class="leg" style="flex:1;min-width:150px">' + jleg + '</ul></div></div>' +
-    '<div class="card bars"><h3>Sebaran kawasan konservasi</h3><p class="sub">Jumlah usulan per kawasan</p>' + kbars + '</div>' +
-    '<div class="card gauge"><h3 style="text-align:left">Capaian target monev</h3><p class="sub" style="text-align:left">Rata-rata ' + mon.length + ' laporan monitoring</p>' + gauge(avg === null ? 0 : avg) + '<div class="gstats"><div><small>Target</small><b>100%</b></div><div class="hl"><small>Terealisasi</small><b>' + (avg === null ? '—' : avg.toFixed(1) + '%') + '</b></div><div><small>Selisih</small><b>' + (avg === null ? '—' : (100 - avg).toFixed(1) + '%') + '</b></div></div></div></div>' +
-    '<div class="g-map"><div class="card"><div class="card-h"><div><h3>Peta zonasi kemitraan aktif</h3><p class="sub">Batas kawasan (garis putus-putus) dan area pengelolaan usulan.</p></div><div class="sp"></div><a class="lnk" data-act="goPeta">Buka peta penuh ›</a></div><div class="mapbox mid" id="dashMap"></div><div class="map-legend" id="dashLeg"></div></div>' +
-    '<div class="card"><div class="card-h"><div class="ic" style="background:var(--coral-l);color:var(--coral)">' + mi('notifications_active') + '</div><div><h3>Perlu tindakan</h3></div><div class="sp"></div><span class="tag tg-w">' + need.length + ' prioritas</span></div>' + nlist + (need.length ? '<button class="btn btn-o btn-block btn-s" data-act="goDaftar" data-p=\'{"aksi":1}\'>Lihat semua (' + need.length + ')</button>' : '') + '</div></div>' +
-    '<div class="card"><div class="card-h"><div class="ic" style="background:var(--bg);color:var(--tx-2)">' + mi('history') + '</div><div><h3>Linimasa riwayat & progres sistem</h3></div><div class="sp"></div><a class="lnk" data-act="goDaftar" data-p="{}">Lihat pengajuan ›</a></div><div class="tl-h">' + tl + '</div></div>' +
-    '<div class="prinsip"><div class="ic">' + mi('balance') + '</div><div class="tx"><b>Prinsip akuntabilitas & kerangka regulasi konservasi</b><p>Kemitraan pengelolaan kawasan konservasi perairan Provinsi Sulawesi Tengah dijalankan melalui 12 tahapan yang terdokumentasi. Setiap keputusan tercatat pada jejak audit, dan penyusunan, pemaparan, serta penandatanganan PKS mengikuti ketentuan peraturan perundang-undangan yang berlaku.</p></div><button class="btn" data-act="bantuan">' + mi('menu_book') + ' Panduan tata kelola</button></div>');
-  // peta ringkas
-  const draw = function () {
-    const pt = S.peta; if (!pt) return; const ar = pt.areas.filter(function (a) { return ids[a.id_pengajuan]; });
-    const bt = pt.batas.filter(function (b) { return !S.dash.kawasan || b.kawasan === S.dash.kawasan; });
-    if (!S._dm) return; S._dm.update(bt, ar);
-    const lg = $('dashLeg'); if (lg) lg.innerHTML = (pt.batas.length || ar.length) ? petaLegend() : '<span>Belum ada area/batas yang diunggah.</span>';
-  };
-  S._dm = MapKit.overview($('dashMap'), { scroll: false, onOpen: function (id) { navigateTo('detail', { id: id }); } });
-  draw(); loadPeta().then(function () { if (S.view === 'dashboard') draw(); }).catch(function (e) { console.warn('peta', e && e.message); });
-}
-function petaLegend() { return '<span><i style="background:rgba(14,143,148,.15);border:2px dashed #0a6f73"></i>Batas kawasan</span>' + ['Berjalan', 'Perlu dilengkapi', 'Pelaksanaan', 'Selesai', 'Draft'].map(function (k) { return '<span><i style="background:' + MapKit.WARNA[k] + '"></i>' + k + '</span>'; }).join(''); }
-
-/* ----------------------------- Berita Acara & PKS ----------------------------- */
-function vDokumen() {
-  setTitle('Berita Acara & PKS');
-  setView('<div class="ph"><div><h2>Berita Acara & PKS</h2><p>Dokumen resmi seluruh pengajuan yang dapat Anda akses.</p></div></div><div class="pill-filter" id="dkTabs" style="margin-bottom:14px"></div><div id="dkBody">' + skel() + '</div>');
-  const draw = function () {
-    const r = S.dok; if (!r || S.view !== 'dokumen') return;
-    const all = r.ba.map(function (x) { return Object.assign({ _t: 'Berita Acara ' + x.jenis, _k: 'ba', _st: x.status, _ok: x.status === 'Disahkan' }, x); }).concat(r.pks.map(function (x) { return Object.assign({ _t: 'Perjanjian Kemitraan (PKS)', _k: 'pks', _st: x.status, _ok: x.status === 'Ditandatangani' }, x); }));
-    const tabs = [['semua', 'Semua (' + all.length + ')'], ['ba', 'Berita Acara (' + r.ba.length + ')'], ['pks', 'PKS (' + r.pks.length + ')']];
-    $('dkTabs').innerHTML = tabs.map(function (t) { return '<button class="' + (S.dokTab === t[0] ? 'on' : '') + '" data-act="dokTab" data-t="' + t[0] + '">' + t[1] + '</button>'; }).join('');
-    const rows = all.filter(function (x) { return S.dokTab === 'semua' || x._k === S.dokTab; });
-    $('dkBody').innerHTML = rows.length ? '<div class="grid g2">' + rows.map(function (x) {
-      return '<div class="card"><div class="card-h" style="margin-bottom:6px"><div class="ic" style="background:' + (x._ok ? 'var(--green-l);color:var(--green-d)' : 'var(--bg);color:var(--tx-2)') + '">' + mi(x._k === 'pks' ? 'handshake' : 'description') + '</div><div style="min-width:0"><h3 style="font-size:14px">' + esc(x._t) + '</h3><p class="sub">' + esc(x.nomor || '(belum bernomor)') + '</p></div><div class="sp"></div><span class="chip ' + (x._ok ? 'c-ok' : 'c-draft') + '">' + esc(x._st) + '</span></div>' +
-        '<p class="t-b">' + esc(x.judul) + '</p><p class="t-sub">' + esc(x.nomor_pengajuan) + ' · ' + esc(x.lembaga) + ' · ' + esc(x.kawasan) + '</p>' +
-        (x._ok && x.kode ? '<p class="t-sub" style="margin-top:8px">Kode verifikasi:</p><div class="codebox">' + esc(x.kode) + '</div>' : '') +
-        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-o btn-s" data-act="openTab" data-id="' + esc(x.id_pengajuan) + '" data-tab="ba">' + mi('open_in_new', 'font-size:16px') + ' Buka pengajuan</button>' + (x._ok && x.kode ? '<button class="btn btn-o btn-s" data-act="copyKode" data-k="' + esc(x.kode) + '">' + mi('content_copy', 'font-size:16px') + ' Salin kode</button>' : '') + '</div></div>';
-    }).join('') + '</div>' : '<div class="card empty">' + mi('description') + 'Belum ada dokumen.</div>';
-  };
-  S._dokDraw = draw; if (S.dok) draw();
-  api('dokumen_list').then(function (r) { S.dok = r; draw(); }).catch(function (e) { if (!S.dok) $('dkBody').innerHTML = '<div class="callout bad">' + mi('error') + '<span>' + esc(e.message) + '</span></div>'; });
-}
-
-/* ----------------------------- Laporan & Statistik ----------------------------- */
-function vStatistik() {
-  setTitle('Laporan & Statistik'); const D = S.daftar.filter(function (p) { return !p._pending; });
-  const act = function (p) { return FINAL.indexOf(p.status) === -1; };
-  const sumB = function (a) { return a.reduce(function (s, p) { return s + (Number(p.biaya) || 0); }, 0); };
-  const months = []; const n = new Date(); for (let i = 11; i >= 0; i--) { const d = new Date(n.getFullYear(), n.getMonth() - i, 1); months.push({ y: d.getFullYear(), m: d.getMonth(), n: 0, l: d.toLocaleDateString('id-ID', { month: 'short' }) }); }
-  D.forEach(function (p) { const d = new Date(p.dibuat); months.forEach(function (m) { if (m.y === d.getFullYear() && m.m === d.getMonth()) m.n++; }); });
-  const mxm = Math.max(1, Math.max.apply(null, months.map(function (m) { return m.n; })));
-  const chart = '<div class="bar-chart" role="img" aria-label="Pengajuan per bulan">' + months.map(function (m) { return '<div class="b"><em>' + (m.n || '') + '</em><i style="height:' + (m.n / mxm * 100) + '%"></i><span>' + m.l + '</span></div>'; }).join('') + '</div>';
-  const faseRows = PHASES.map(function (ph) { const it = D.filter(function (p) { return act(p) && p.tahap >= ph.t1 && p.tahap <= ph.t2; }); return '<tr style="cursor:default"><td>' + esc(ph.nama) + '</td><td>' + it.length + '</td><td>' + rpBig(sumB(it)) + '</td></tr>'; }).join('') +
-    '<tr style="cursor:default"><td>Selesai</td><td>' + D.filter(function (p) { return p.status === 'Selesai'; }).length + '</td><td>' + rpBig(sumB(D.filter(function (p) { return p.status === 'Selesai'; }))) + '</td></tr><tr style="cursor:default"><td>Tidak dilanjutkan</td><td>' + D.filter(function (p) { return p.status === 'Tidak dilanjutkan'; }).length + '</td><td>' + rpBig(sumB(D.filter(function (p) { return p.status === 'Tidak dilanjutkan'; }))) + '</td></tr>';
+  const faseRows = PHASES.map(function (ph) { const it = D.filter(function (p) { return act(p) && p.tahap >= ph.t1 && p.tahap <= ph.t2; }); return '<tr style="cursor:default"><td>' + esc(ph.nama) + '</td><td>' + it.length + '</td></tr>'; }).join('') +
+    '<tr style="cursor:default"><td>Selesai</td><td>' + D.filter(function (p) { return p.status === 'Selesai'; }).length + '</td></tr><tr style="cursor:default"><td>Tidak dilanjutkan</td><td>' + D.filter(function (p) { return p.status === 'Tidak dilanjutkan'; }).length + '</td></tr>';
   const jn = {}; D.forEach(function (p) { jn[p.jenis_mitra] = (jn[p.jenis_mitra] || 0) + 1; });
   const jRows = Object.keys(jn).sort(function (a, b) { return jn[b] - jn[a]; }).map(function (k) { return '<tr style="cursor:default"><td>' + esc(jenisNama(k)) + '</td><td>' + jn[k] + '</td></tr>'; }).join('') || '<tr><td colspan="2" class="t-sub">Belum ada data.</td></tr>';
   const kwRows = function () {

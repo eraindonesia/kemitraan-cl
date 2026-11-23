@@ -60,12 +60,20 @@ function saveTelaahBiaya() {
   const before = d.telaah_pembiayaan; d.telaah_pembiayaan = Object.assign({ penelaah: S.me.nama }, v); S.dirty = false; renderDetailBody(); toast('ok', 'Telaah pembiayaan disimpan.');
   bg('Simpan telaah pembiayaan', function () { return api('telaah_simpan', v); }, function () { d.telaah_pembiayaan = before; renderDetailBody(); });
 }
-function saveMonev() {
+function saveMonev(btn) {
   const p = curP(), d = ensureDet(); if (!d) return; const per = $('mvP').value.trim(); if (!per) { toast('bad', 'Periode wajib diisi.'); return; }
   const cap = Number($('mvC').value || 0); if (isNaN(cap) || cap < 0 || cap > 100) { toast('bad', 'Capaian harus 0–100.'); return; }
+  const fi = $('mvF'); const f = fi && fi.files && fi.files[0]; const wajib = S.me.peran !== 'mitra';
+  if (wajib && !f) { toast('bad', 'Berkas laporan monev (PDF) wajib diunggah.'); return; }
+  if (f) { if (f.name.split('.').pop().toLowerCase() !== 'pdf') { toast('bad', 'Berkas harus berformat PDF.'); return; } if (f.size > 8 * 1024 * 1024) { toast('bad', 'Ukuran berkas melebihi 8 MB.'); return; } }
   const v = { id: p.id, periode: per, target: $('mvT').value, capaian_persen: cap, realisasi_pembiayaan: $('mvR').value, kendala: $('mvK').value, rekomendasi: $('mvRek').value };
-  const row = Object.assign({ id: 'tmp', id_pengajuan: p.id, pelapor: S.me.nama, dibuat: new Date().toISOString() }, v); d.monev.unshift(row); S.monev.unshift(row); renderDetailBody(); toast('ok', 'Laporan monev terkirim.');
-  bg('Kirim monev', function () { return api('monev_simpan', v).then(function (r) { Object.assign(row, r); }); }, function () { d.monev = d.monev.filter(function (x) { return x !== row; }); S.monev = S.monev.filter(function (x) { return x !== row; }); renderDetailBody(); });
+  const kirim = function () {
+    loadingBtn(btn, true);
+    api('monev_simpan', v).then(function (r) { d.monev.unshift(r); S.monev.unshift(r); toast('ok', 'Laporan monev terkirim.'); renderDetailBody(); }).catch(function (e) { toast('bad', e.message); loadingBtn(btn, false); });
+  };
+  if (!f) { kirim(); return; }
+  const rd = new FileReader(); rd.onload = function () { v.nama = f.name; v.base64 = String(rd.result).split(',')[1]; kirim(); };
+  rd.onerror = function () { toast('bad', 'Gagal membaca berkas.'); }; rd.readAsDataURL(f);
 }
 function reloadDetailSoon(id) { delete S.det[id]; if (S.view === 'detail' && S.params.id === id) loadDetail(id, true); }
 function ttdUpload(btn, jenis) {
@@ -275,7 +283,7 @@ const ACT = {
     loadingBtn(el, true); api('jadwal_simpan', v).then(function (r) { d.jadwal = r; renderDetailBody(); toast('ok', 'Jadwal pemaparan disimpan.'); waHasil(r.wa); }).catch(function (e) { toast('bad', e.message); loadingBtn(el, false); });
   },
   batalJadwal: function () { const p = curP(), d = ensureDet(); modal({ title: 'Batalkan jadwal pemaparan?', body: '<p>Mitra akan diberi tahu. Pemaparan tidak dapat ditandai selesai sebelum jadwal baru ditetapkan.</p>', ok: 'Batalkan jadwal', danger: true, onOk: function () { return api('jadwal_simpan', { id: p.id, batalkan: true }).then(function (r) { d.jadwal = r; renderDetailBody(); toast('ok', 'Jadwal dibatalkan.'); waHasil(r.wa); }); } }); },
-  saveCk: saveChecklist, saveTp: saveTelaahProgram, saveTb: saveTelaahBiaya, saveMv: saveMonev,
+  saveCk: saveChecklist, saveTp: saveTelaahProgram, saveTb: saveTelaahBiaya, saveMv: function (el) { saveMonev(el); }, goPelaporan: function () { navigateTo('pelaporan'); }, bukaMonev: function (el) { navigateTo('detail', { id: el.dataset.id, tab: 'monev' }); },
   wilAdd: function () { $('wilList').insertAdjacentHTML('beforeend', wilRow({})); }, progAdd: function () { const d = S.wiz.data; d.programs = progList(d).concat([{ jenis: 'mandiri', id_program: '', nama: '', keterangan: '' }]); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
   progDel: function (el) { const d = S.wiz.data; const own = progList(d).filter(function (x) { return x.jenis === 'mandiri'; })[+el.dataset.i]; d.programs = progList(d).filter(function (x) { return x !== own; }); if (!S.wiz.editId) LS.set('sm_form', d); renderWiz(); },
   ttdUp: function (el) { ttdUpload(el, el.dataset.j); }, savePks: function (el) { savePKS(el); },
