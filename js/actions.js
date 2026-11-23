@@ -179,7 +179,7 @@ function gAtur() {
 }
 function showPw(title, user, pw) { modal({ title: title, body: '<p>Akun: <b>' + esc(user.email) + '</b></p><p style="margin-top:8px">Kata sandi sementara:</p><div class="card" style="font-family:monospace;font-size:18px;text-align:center;padding:12px;margin-top:6px;user-select:all">' + esc(pw) + '</div><p class="hint" style="margin-top:8px">Catat sekarang; kata sandi tidak ditampilkan lagi.</p>', hideCancel: true }); }
 function addUser() {
-  const roles = [['prl', 'Tim Bidang PRL'], ['uptd', 'UPTD Pengelola Kawasan'], ['kepala_dkp', 'Kepala Dinas'], ['admin', 'Admin (UPTD) — validasi & unggah TTD'], ['superadmin', 'Super Admin'], ['mitra', 'Mitra']];
+  const roles = [['admin', 'Admin UPTD — permohonan, verifikasi dokumen, draf PKS, lapor DKP, TTD PKS, monev'], ['prl', 'Admin Bidang PRL (maks. 3) — ruang & RPZ, penilaian, pemaparan, kesepakatan'], ['uptd', 'UPTD Pengelola Kawasan (setara Admin UPTD)'], ['kepala_dkp', 'Kepala Dinas'], ['superadmin', 'Super Admin'], ['mitra', 'Mitra']];
   modal({ title: 'Tambah pengguna', body: '<div class="fld"><label>Nama <i>*</i></label><input class="in" id="auN"></div><div class="fld"><label>' + (googleOnlyUI() ? 'Email Google' : 'Email') + ' <i>*</i></label><input class="in" type="email" id="auE"></div><div class="row2"><div class="fld"><label>Peran <i>*</i></label><select class="in" id="auR">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div><div class="fld"><label>Lembaga</label><input class="in" id="auL"></div></div><div class="fld"><label>Telepon / WhatsApp</label><input class="in" id="auT" inputmode="tel" placeholder="mis. 081234567890"><div class="hint">Dipakai untuk kiriman jadwal pemaparan lewat WhatsApp (wajib diisi untuk Admin UPTD).</div></div>' + wilFld('auW', '') + '<p class="hint">Wilayah hanya berlaku untuk peran Admin (UPTD) dan UPTD. Buat satu akun Admin untuk tiap wilayah.</p>', ok: 'Buat akun', onOk: function () {
     return api('buat_user', { nama: $('auN').value, email: $('auE').value, peran: $('auR').value, lembaga: $('auL').value, telepon: $('auT').value, wilayah: $('auW').value }).then(function (r) { S.users = null; setTimeout(function () { if (r.password) showPw('Akun dibuat', r.user, r.password); else modal({ title: 'Akun dibuat', body: '<p>Pengguna <b>' + esc(r.user.email) + '</b> dapat langsung masuk dengan tombol <b>Masuk dengan Google</b> memakai akun Google tersebut. Tidak ada kata sandi yang perlu dibagikan.</p>', ok: 'Mengerti', hideCancel: true, onOk: function () { closeModal(); } }); if (S.view === 'users') vUsers(); }, 50); });
   } });
@@ -378,5 +378,17 @@ Object.assign(ACT, {
   ntHapus: function () { if (!confirm('Hapus token Fonnte? Pengiriman otomatis berhenti dan kembali ke tombol WhatsApp manual.')) return; api('notif_simpan', { hapus_token: true }).then(function (s) { toast('ok', 'Token dihapus.'); renderNtf(s); }).catch(function (e) { toast('bad', e.message); }); },
   ntUji: function (el) {
     modal({ title: 'Kirim pesan uji WhatsApp', body: '<div class="fld"><label>Nomor tujuan</label><input class="in" id="ntNo" inputmode="tel" placeholder="mis. 081234567890"></div><p class="hint">Pesan uji dimasukkan ke antrean lalu langsung diproses.</p>', ok: 'Kirim uji', onOk: function () { return api('notif_proses', { uji: $('ntNo').value }).then(function (s) { renderNtf(s); const t = s.terbaru[0]; toast(t && t.status === 'Terkirim' ? 'ok' : 'bad', t ? 'Hasil uji: ' + t.status + (t.respon ? ' (' + t.respon + ')' : '') : 'Tidak ada hasil.'); }); } });
+  }
+});
+
+Object.assign(ACT, {
+  jdWa: function (el) { const p = curP(); loadingBtn(el, true); api('jadwal_wa', { id: p.id }).then(function (w) { loadingBtn(el, false); if (!w.penerima.length) { toast('bad', 'Tidak ada penerima.'); return; } waHasil(w); }).catch(function (e) { loadingBtn(el, false); toast('bad', e.message); }); },
+  hapusP: function () {
+    const p = curP(); if (!p) return;
+    modal({ title: 'Hapus usulan secara permanen?', danger: true, ok: 'Hapus permanen', body: '<p>Usulan <b>' + esc(p.nomor) + '</b> — ' + esc(p.judul) + ' (' + esc(p.lembaga) + ') akan dihapus <b>beserta seluruh datanya</b>: berkas unggahan (dipindah ke Sampah Drive), checklist, telaah, area peta, jadwal, BA, PKS, monev, dan riwayat. <b>Tidak dapat dibatalkan.</b></p><div class="fld" style="margin-top:10px"><label>Ketik nomor usulan untuk konfirmasi</label><input class="in" id="hpK" autocomplete="off" placeholder="' + esc(p.nomor) + '"></div>',
+      onOk: function () {
+        const k = $('hpK').value.trim(); if (k.toUpperCase() !== String(p.nomor).toUpperCase()) return Promise.reject(new Error('Ketik nomor usulan persis seperti yang tertera.'));
+        return api('hapus_pengajuan', { id: p.id, konfirmasi: k }).then(function () { S.daftar = (S.daftar || []).filter(function (x) { return x.id !== p.id; }); S.list = null; navigateTo('daftar', {}); toast('ok', 'Usulan ' + p.nomor + ' dihapus permanen.'); });
+      } });
   }
 });
