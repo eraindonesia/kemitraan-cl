@@ -28,7 +28,7 @@ function renderWiz() {
       '<div class="row2"><div class="fld"><label>Kawasan konservasi <i>*</i></label><select class="in" data-f="kawasan"><option value="">Pilih kawasan…</option>' + S.master.kawasan.map(function (x) { return '<option' + (d.kawasan === x.nama ? ' selected' : '') + '>' + esc(x.nama) + '</option>'; }).join('') + '</select></div>' +
       '<div class="fld"><label>Zona <i>*</i></label><select class="in" data-f="zona"><option value="">Pilih zona…</option>' + zs.map(function (z) { return '<option' + (d.zona === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="fld"><label>Lokasi / area kegiatan <i>*</i></label><input class="in" data-f="lokasi" value="' + f('lokasi') + '"></div><div class="fld"><label>Luas area</label><input class="in" data-f="luas" placeholder="mis. 25 Ha" value="' + f('luas') + '"></div>';
-    if (!w.editId) { c += '<div class="fld"><label>Area pengelolaan (opsional)</label><p class="hint">Gambar poligon area yang diusulkan, atau impor Shapefile / GeoJSON / daftar koordinat. Dapat ditambah atau diubah nanti pada tab Peta Area.</p><div id="wizMap"></div></div>'; setTimeout(wizMapInit, 0); }
+    if (!w.editId) { c += '<div class="fld"><label>Area pengelolaan (opsional)</label><p class="hint">Unggah <b>Shapefile</b> (.zip) area kegiatan yang diusulkan. Dapat diganti atau ditambah nanti pada tab Peta Area selama usulan masih Draft.</p><div id="wizMap"></div></div>'; setTimeout(wizMapInit, 0); }
   } else if (st === 3) {
     c = '<div class="row2"><div class="fld"><label>Total rencana anggaran (Rp)</label><input class="in" type="number" min="0" data-f="biaya" value="' + f('biaya') + '"></div><div class="fld"><label>Sumber pembiayaan</label><input class="in" data-f="sumber" placeholder="Swadaya / CSR / hibah…" value="' + f('sumber') + '"></div></div>' +
       '<div class="callout info">' + mi('attach_file') + '<span>Dokumen persyaratan diunggah pada halaman detail setelah draft disimpan.</span></div>';
@@ -62,7 +62,7 @@ function progReview(d) {
 }
 function wizMapInit() {
   const el = $('wizMap'); if (!el || S.view !== 'form' || !S.wiz || S.wiz.step !== 2) return; const d = S.wiz.data;
-  const ed = MapKit.editor(el, { geom: d.area && d.area.geojson, kawasan: d.kawasan, batas: S.peta ? S.peta.batas : [], maxChars: 40000,
+  const ed = MapKit.editor(el, { geom: d.area && d.area.geojson, kawasan: d.kawasan, batas: S.peta ? S.peta.batas : [], maxChars: 40000, shpOnly: true,
     onChange: function (g) { d.area = g ? { nama: 'Area 1', geojson: g } : null; LS.set('sm_form', d); } });
   S.wizEd = ed; if (!S.peta && ed) loadPeta().then(function () { if (S.wizEd === ed) ed.setBatas(S.peta.batas); }).catch(function () {});
 }
@@ -162,7 +162,7 @@ function tDokumen(p, d) {
   const fs = d.berkas.filter(function (b) { return b.item === cur; });
   const pane = '<div class="dok-pane"><div class="dok-ph"><div><span class="eyebrow-s">' + (isLain ? 'Opsional' : 'Persyaratan ' + (si + 1) + ' dari ' + n) + '</span><h4>' + (isLain ? 'Dokumen pendukung lainnya' : esc(cur)) + '</h4></div>' +
     (isLain ? '' : (fs.length ? '<span class="chip c-ok">' + mi('check', 'font-size:14px') + ' Terunggah</span>' : '<span class="chip c-draft">Belum diunggah</span>')) + '</div>' +
-    (up ? '<label class="dropz" for="fuCur" tabindex="0">' + mi('cloud_upload') + '<b>Pilih berkas untuk persyaratan ini</b><small>PDF, JPG, PNG, DOCX, XLSX · maks. 8 MB</small></label><input type="file" id="fuCur" data-item="' + esc(cur) + '" data-chg="upload" hidden accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx">' : '') +
+    (up ? '<label class="dropz" for="fuCur" tabindex="0">' + mi('cloud_upload') + '<b>Pilih berkas untuk persyaratan ini</b><small>Hanya PDF · maks. 8 MB</small></label><input type="file" id="fuCur" data-item="' + esc(cur) + '" data-chg="upload" hidden accept=".pdf,application/pdf">' : '') +
     '<div class="dok-files">' + (fs.length ? fs.map(function (b) { return fileChip(b, up); }).join('') : '<p class="hint">Belum ada berkas pada poin ini.</p>') + '</div>' +
     '<div class="dok-nav"><button type="button" class="btn btn-o btn-s" data-act="dokItem" data-i="' + Math.max(0, si - 1) + '"' + (si === 0 ? ' disabled' : '') + '>' + mi('chevron_left') + ' Sebelumnya</button><button type="button" class="btn btn-o btn-s" data-act="dokItem" data-i="' + Math.min(req.length - 1, si + 1) + '"' + (si === req.length - 1 ? ' disabled' : '') + '>Berikutnya ' + mi('chevron_right') + '</button></div></div>';
   return '<div class="card dok"><div class="dok-top"><div><h3>Dokumen persyaratan</h3><p class="sub">Daftar persyaratan mengikuti Data Master untuk jenis mitra: <b>' + esc((((S.master.jenis || []).filter(function (j) { return j.kode === p.jenis_mitra; })[0]) || {}).nama || 'belum ditentukan') + '</b>.</p></div>' +
@@ -202,7 +202,7 @@ function tBA(p, d) {
     const b = ttdBerkas(d, c.jenis); const win = c.tahap.indexOf(p.tahap) > -1 || isSuper(); const edit = role && win;
     const rec = c.jenis.indexOf('BA ') === 0 ? d.ba.filter(function (x) { return x.jenis === c.jenis.substr(3); })[0] : d.pks[0];
     const id = 'tt' + c.jenis.replace(/\W/g, '');
-    const form = edit ? '<div class="fld" style="margin-top:12px"><label>' + (b ? 'Ganti berkas' : 'Unggah berkas') + ' (PDF/JPG/PNG, maks. 8 MB)</label><input type="file" class="in" id="' + id + 'F" accept=".pdf,.jpg,.jpeg,.png"></div>' +
+    const form = edit ? '<div class="fld" style="margin-top:12px"><label>' + (b ? 'Ganti berkas' : 'Unggah berkas') + ' (hanya PDF, maks. 8 MB)</label><input type="file" class="in" id="' + id + 'F" accept=".pdf,application/pdf"></div>' +
       '<div class="row2">' + (c.tgl ? '<div class="fld"><label>Tanggal penandatanganan <i>*</i></label><input type="date" class="in" id="' + id + 'T" value="' + esc(rec && rec.tanggal ? String(rec.tanggal).substr(0, 10) : '') + '"></div>' : '') + '<div class="fld"><label>Nomor dokumen</label><input class="in" id="' + id + 'N" value="' + esc(rec && rec.nomor ? rec.nomor : '') + '" placeholder="Opsional"></div></div>' +
       '<div class="fld"><label>Catatan</label><input class="in" id="' + id + 'C" value="' + esc(c.jenis.indexOf('BA ') === 0 && rec ? rec.kesimpulan || '' : '') + '"></div>' +
       '<div style="text-align:right"><button class="btn btn-p" data-act="ttdUp" data-j="' + esc(c.jenis) + '">' + mi('upload_file') + ' ' + (b ? 'Ganti berkas' : 'Unggah') + '</button></div>' : '';
@@ -236,19 +236,19 @@ function tJadwal(p, d) {
   return '<div class="card"><h3>Jadwal pemaparan program ' + tag + '</h3><p class="sub">Tahap 6 — presentasi program kepada tim PRL dan UPTD</p>' + view + form + '</div>';
 }
 
-/** Hasil pengiriman WhatsApp setelah jadwal ditetapkan/dibatalkan: otomatis (token Fonnte) atau tombol sekali-klik (wa.me). */
+/** Hasil WhatsApp setelah jadwal ditetapkan/dibatalkan: masuk antrean otomatis (token Fonnte aktif) atau tombol sekali-klik (wa.me). */
 function waHasil(w) {
   if (!w || !w.penerima || !w.penerima.length) return;
-  const oto = w.mode === 'otomatis'; const ok = w.penerima.filter(function (x) { return x.terkirim; }).length;
-  const sisa = w.penerima.filter(function (x) { return !x.terkirim; });
-  if (oto && !sisa.length) { toast('ok', 'WhatsApp terkirim ke ' + ok + ' penerima.'); return; }
+  const q = w.mode === 'antrian'; const antri = w.penerima.filter(function (x) { return x.status === 'antri'; }).length;
+  const sisa = w.penerima.filter(function (x) { return !(q && x.status === 'antri'); });
+  if (q && !sisa.length) { toast('ok', 'WhatsApp masuk antrean untuk ' + antri + ' penerima, terkirim otomatis dalam ±1 menit.'); return; }
   const rows = w.penerima.map(function (x) {
     let st;
-    if (x.terkirim) st = '<span class="chip c-ok">Terkirim</span>';
+    if (q && x.status === 'antri') st = '<span class="chip c-ok">Dalam antrean</span>';
     else if (!x.nomor) st = '<span class="chip c-bad">Nomor belum diisi</span>';
     else st = '<a class="btn btn-p btn-s" target="_blank" rel="noopener" href="' + esc(x.link) + '">Kirim lewat WhatsApp</a>';
-    return '<div class="wa-row"><div><b>' + esc(x.nama) + '</b><small>' + esc(x.peran_nama) + (x.nomor ? ' · +' + esc(x.nomor) : '') + (x.galat ? ' · ' + esc(x.galat) : '') + '</small></div>' + st + '</div>';
+    return '<div class="wa-row"><div><b>' + esc(x.nama) + '</b><small>' + esc(x.peran_nama) + (x.nomor ? ' · +' + esc(x.nomor) : '') + '</small></div>' + st + '</div>';
   }).join('');
-  modal({ title: oto ? 'WhatsApp: ' + ok + ' terkirim, ' + sisa.length + ' perlu tindakan' : 'Kirim jadwal lewat WhatsApp', sub: oto ? '' : 'Pengiriman otomatis belum diaktifkan. Klik tombol di tiap penerima; pesan sudah terisi.',
-    body: '<div class="wa-list">' + rows + '</div><p class="hint" style="margin-top:10px">Nomor diambil dari data pengguna. Admin UPTD yang nomornya kosong dapat dilengkapi di Manajemen Pengguna.</p>', ok: 'Selesai', hideCancel: true });
+  modal({ title: q ? 'WhatsApp: ' + antri + ' dalam antrean, ' + sisa.length + ' perlu tindakan' : 'Kirim jadwal lewat WhatsApp', sub: q ? '' : 'Pengiriman otomatis belum aktif (Super Admin: Data Master → Notifikasi). Klik tombol di tiap penerima; pesan sudah terisi.',
+    body: '<div class="wa-list">' + rows + '</div><p class="hint" style="margin-top:10px">Nomor diambil dari data pengguna. Lengkapi nomor yang kosong di Manajemen Pengguna.</p>', ok: 'Selesai', hideCancel: true });
 }

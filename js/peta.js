@@ -260,7 +260,7 @@ const MapKit = (function () {
   /** Widget editor lengkap di dalam host. opts: {geom, kawasan, batas, onChange(geom|null, luas), maxChars, satelit, readonly} */
   function editor(host, opts) {
     opts = opts || {}; const maxChars = opts.maxChars || 40000, maxVert = opts.maxVert || MAX_VERT;
-    host.innerHTML = (opts.readonly ? '' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('edit_location') + ' Isi koordinat / Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>') +
+    host.innerHTML = (opts.readonly ? '' : (opts.shpOnly ? '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="import">' + mi('upload_file') + ' Unggah Shapefile</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button></div>' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('edit_location') + ' Isi koordinat / Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>')) +
       '<div class="mapbox"></div><div class="mapinfo" aria-live="polite"></div><div class="mapcheck"></div>';
     const box = host.querySelector('.mapbox'), info = host.querySelector('.mapinfo'), chk = host.querySelector('.mapcheck');
     const map = create(box, { satelit: opts.satelit, modal: opts.modal }); if (!map) return null;
@@ -302,7 +302,8 @@ const MapKit = (function () {
       pn.innerHTML = '<p class="sub" style="margin-bottom:8px">Tempel <b>GeoJSON</b> (Polygon / MultiPolygon / Feature / FeatureCollection, koordinat [bujur, lintang]) <b>atau</b> daftar titik, satu per baris: <code>lintang,bujur</code>. Atau pilih berkas <b>Shapefile</b> (.zip, atau .shp + .prj + .dbf sekaligus) / .geojson / .json.</p>' +
         '<textarea class="in" data-imp="txt" rows="6" placeholder="-0.8917,119.8707&#10;-0.8920,119.8750&#10;-0.8950,119.8730"></textarea><input type="file" data-imp="file" multiple accept=".zip,.shp,.dbf,.prj,.cpg,.shx,.geojson,.json,.txt,application/json,application/zip" style="margin-top:8px"><div class="hint" data-imp="info" style="margin-top:6px"></div><div class="fld" data-imp="katbox" style="display:none;margin-top:8px"><label>Kolom kategori (tiap kategori diberi warna berbeda)</label><select class="in" data-imp="kol"></select></div><div class="fld" style="margin-top:8px"><label>Atau ambil dari ArcGIS Online (URL layer fitur publik)</label><div style="display:flex;gap:6px"><input class="in" data-imp="arc" placeholder="https://services.arcgis.com/…/FeatureServer/0"><button type="button" class="btn btn-o btn-s" data-imp="arcgo">Ambil</button></div></div>' +
         '<div class="errtxt" data-imp="err" role="alert"></div><div class="btns" style="margin-top:8px"><button type="button" class="btn btn-o btn-s" data-imp="cancel">Batal</button><button type="button" class="btn btn-p btn-s" data-imp="ok">Gunakan</button></div>';
-      host.insertBefore(pn, box); const q = function (k) { return pn.querySelector('[data-imp="' + k + '"]'); };
+      host.insertBefore(pn, box.parentNode === host ? box : null); const q = function (k) { return pn.querySelector('[data-imp="' + k + '"]'); };
+      if (opts.shpOnly) { pn.querySelector('p.sub').innerHTML = 'Unggah <b>Shapefile</b> area kegiatan Anda: satu berkas <b>.zip</b> berisi .shp, .shx, .dbf, dan .prj (disarankan), atau pilih berkas <b>.shp + .dbf + .prj</b> sekaligus. Hanya format Shapefile yang diterima.'; q('txt').style.display = 'none'; q('arc').closest('.fld').style.display = 'none'; q('file').accept = '.zip,.shp,.shx,.dbf,.prj,.cpg'; q('file').style.marginTop = '0'; }
       q('cancel').onclick = function () { pn.remove(); };
       let pend = null; // {fc, cols} dari Shapefile / ArcGIS; kategori dipilih lewat kolom
       const AUTO = /^(kategori|zona|zonasi|fungsi|klas|kelas|jenis|tipe|type|nama_zona|zone|nama|name|status|kode)/i;
@@ -331,6 +332,7 @@ const MapKit = (function () {
           readShapefile(fs).then(function (g) { setPending({ type: 'FeatureCollection', features: g.features }); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message || 'Shapefile tidak dapat dibaca.'; });
           return;
         }
+        if (opts.shpOnly) { q('err').textContent = 'Hanya Shapefile (.zip atau .shp) yang diterima.'; this.value = ''; return; }
         const f = fs[0]; if (f.size > 3 * 1024 * 1024) { q('err').textContent = 'Berkas terlalu besar (maks. 3 MB).'; return; } const r = new FileReader(); r.onload = function () { q('txt').value = r.result; }; r.readAsText(f);
       };
       q('arcgo').onclick = function () {
@@ -338,7 +340,7 @@ const MapKit = (function () {
         fetchArcgis(q('arc').value, 5).then(function (fc) { if (!fc.features.length) throw new Error('Layer tidak berisi fitur.'); setPending(fc); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message; });
       };
       q('ok').onclick = function () {
-        const btn = q('ok'); const work = function () {
+        const btn = q('ok'); if (opts.shpOnly && !pend) { q('err').textContent = 'Pilih berkas Shapefile terlebih dahulu.'; return; } const work = function () {
           let g; try { g = normalize(pend ? withKat(pend.fc, q('kol').value) : parseText(q('txt').value), maxChars, maxVert); } catch (e) { q('err').textContent = e.message; q('info').textContent = ''; btn.disabled = false; return; }
         complex = null; const ps = polysOf(g.geom); if (!g.kats.length && ps.length === 1 && ps[0].length === 1) { pts = ps[0][0].slice(0, -1).map(function (p) { return [p[1], p[0]]; }); } else { pts = []; complex = g.geom; }
         setDrawing(false); render(true); changed(); if (g.note) toast('', 'Poligon ' + g.note + ' agar muat (' + g.vert + ' titik).'); if (g.kats.length) toast('ok', g.kats.length + ' kategori diberi warna berbeda.'); pn.remove();

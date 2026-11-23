@@ -205,7 +205,7 @@ function vPeta() {
     const ar = pt.areas.filter(function (a) { return (!f.kawasan || a.kawasan === f.kawasan) && (!f.grup || groupOf(a) === f.grup); });
     const bt = pt.batas.filter(function (b) { return !f.kawasan || b.kawasan === f.kawasan; });
     S._pm.update(bt, ar); $('petaSum').innerHTML = '<b>' + ar.length + '</b> area · ' + bt.length + ' batas kawasan';
-    $('petaEmpty').textContent = (!pt.areas.length && !pt.batas.length) ? 'Belum ada area atau batas yang diunggah. Mitra menggambar area pada pengajuannya; Admin mengunggah batas di Data Master & Batas.' : '';
+    $('petaEmpty').textContent = (!pt.areas.length && !pt.batas.length) ? 'Belum ada area atau batas yang diunggah. Mitra mengunggah Shapefile area pada pengajuannya; Admin mengunggah batas di Data Master & Batas.' : '';
   };
   S._pdraw = draw;
   S._pm = MapKit.overview($('petaMap'), { onOpen: function (id) { navigateTo('detail', { id: id }); }, onClick: cek, fitAreas: true });
@@ -231,8 +231,7 @@ function openBantuan() {
 /* ----------------------------- Tab Peta pada detail ----------------------------- */
 function canEditAreaP(p) {
   if (FINAL.indexOf(p.status) > -1) return false; const r = S.me.peran;
-  if (r === 'superadmin') return true; if (r === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi');
-  return (r === 'prl' || r === 'uptd') && p.tahap <= 5;
+  return r === 'mitra' && p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi'); // area hanya oleh mitra
 }
 function tPeta(p, d) {
   const edit = canEditAreaP(p); const areas = d.areas || []; const batas = S.peta ? S.peta.batas : [];
@@ -253,13 +252,13 @@ function afterDetailRender() {
 function openAreaModal(p, area) {
   const open = function () {
     let ed = null;
-    modal({ title: area ? 'Ubah area pengelolaan' : 'Tambah area pengelolaan', wide: true, ok: 'Simpan area', sub: 'Kawasan: <b>' + esc(p.kawasan) + '</b>. Gambar poligon pada peta atau impor GeoJSON / daftar koordinat.',
+    modal({ title: area ? 'Ubah area pengelolaan' : 'Tambah area pengelolaan', wide: true, ok: 'Simpan area', sub: 'Kawasan: <b>' + esc(p.kawasan) + '</b>. Unggah Shapefile (.zip) area kegiatan Anda.',
       body: '<div class="fld"><label>Nama area</label><input class="in" id="arNama" maxlength="80" placeholder="mis. Zona pemanfaatan Pantai Utara" value="' + esc(area ? area.nama : '') + '"></div><div id="arMap"></div>',
       onOk: function () {
-        const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Gambar atau impor area terlebih dahulu (minimal 3 titik).'; return false; }
+        const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Unggah Shapefile area terlebih dahulu.'; return false; }
         return api('area_simpan', { id_pengajuan: p.id, id: area ? area.id : undefined, nama: $('arNama').value, geojson: g }).then(function () { S.peta = null; delete S.det[p.id]; toast('ok', 'Area tersimpan.'); loadDetail(p.id, true); });
       } });
-    ed = MapKit.editor($('arMap'), { geom: area ? area.geojson : null, kawasan: p.kawasan, batas: S.peta ? S.peta.batas : [], modal: true, maxChars: 40000 });
+    ed = MapKit.editor($('arMap'), { geom: area ? area.geojson : null, kawasan: p.kawasan, batas: S.peta ? S.peta.batas : [], modal: true, shpOnly: true, maxChars: 40000 });
   };
   if (S.peta) open(); else loadPeta().then(open).catch(open);
 }

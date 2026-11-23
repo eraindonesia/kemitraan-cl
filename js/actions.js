@@ -71,7 +71,7 @@ function reloadDetailSoon(id) { delete S.det[id]; if (S.view === 'detail' && S.p
 function ttdUpload(btn, jenis) {
   const p = curP(); const id = 'tt' + jenis.replace(/\W/g, ''); const g = function (k) { const e = $(id + k); return e ? e.value : ''; };
   const fi = $(id + 'F'); const f = fi && fi.files && fi.files[0]; if (!f) { toast('bad', 'Pilih berkas hasil pindai terlebih dahulu.'); return; }
-  const ext = f.name.split('.').pop().toLowerCase(); if (['pdf', 'jpg', 'jpeg', 'png'].indexOf(ext) === -1) { toast('bad', 'Gunakan PDF, JPG, atau PNG.'); return; }
+  const ext = f.name.split('.').pop().toLowerCase(); if (ext !== 'pdf') { toast('bad', 'Dokumen harus berformat PDF.'); return; }
   if (f.size > 8 * 1024 * 1024) { toast('bad', 'Ukuran berkas melebihi 8 MB.'); return; }
   const slot = TTD_SLOTS.filter(function (x) { return x.jenis === jenis; })[0]; if (slot && slot.tgl && !g('T')) { toast('bad', 'Tanggal penandatanganan wajib diisi.'); return; }
   loadingBtn(btn, true); const rd = new FileReader();
@@ -90,7 +90,7 @@ function savePKS(btn) {
 /* ----------------------------- Berkas ----------------------------- */
 function uploadFile(inp) {
   const f = inp.files && inp.files[0]; if (!f) return; const p = curP(); const item = inp.dataset.item;
-  const ext = f.name.split('.').pop().toLowerCase(); if (['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx'].indexOf(ext) === -1) { toast('bad', 'Tipe berkas tidak diizinkan.'); inp.value = ''; return; }
+  const ext = f.name.split('.').pop().toLowerCase(); if (ext !== 'pdf' || (f.type && f.type !== 'application/pdf')) { toast('bad', 'Dokumen harus berformat PDF.'); inp.value = ''; return; }
   if (f.size > 8 * 1024 * 1024) { toast('bad', 'Ukuran berkas melebihi 8 MB.'); inp.value = ''; return; }
   const rd = new FileReader(); toast('', 'Mengunggah ' + f.name + '…');
   rd.onload = function () {
@@ -106,7 +106,7 @@ function downloadFile(id) {
     const url = URL.createObjectURL(new Blob([arr], { type: r.mime })); const a = document.createElement('a'); a.href = url; a.download = r.nama; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }).catch(function (e) { toast('bad', e.message); });
 }
-/** Pratinjau berkas (PDF/JPG/PNG) di jendela dalam aplikasi; berkas diambil lewat berkas_ambil lalu ditampilkan dari blob lokal. */
+/** Pratinjau berkas (hanya PDF) di jendela dalam aplikasi; berkas diambil lewat berkas_ambil lalu ditampilkan dari blob lokal. */
 let viewUrl = null;
 function viewFile(id) {
   toast('', 'Membuka berkas…');
@@ -193,8 +193,8 @@ function vMaster() {
     '<div class="card" style="margin-bottom:16px"><h3>Wilayah UPTD</h3><p class="sub">Mitra memilih wilayah tempat kegiatan; pengajuan ditangani Admin/UPTD wilayah tersebut. Ubah nama dan cakupan sesuai wilayah kerja. Kode (W1, W2, …) tetap dan tidak dapat dihapus selama masih dipakai.</p><div id="wilList">' + ((m.wilayah || []).map(wilRow).join('')) + '</div><button type="button" class="btn btn-o btn-s" data-act="wilAdd">' + mi('add') + ' Tambah wilayah</button></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Program Dinas yang ditawarkan ke mitra</h3><p class="sub">Satu program per baris. Format: <code>Nama program | Deskripsi singkat</code>. Tambahkan <code>| nonaktif</code> di akhir baris untuk menyembunyikan dari pilihan mitra tanpa menghapus riwayatnya.</p><textarea class="in" id="mProg" rows="12">' + esc(progLinesText()) + '</textarea></div>' +
     '<div class="card" style="margin-bottom:16px"><h3>Persyaratan per jenis mitra</h3><p class="sub">Satu persyaratan per baris.</p>' + m.jenis.map(function (j) { return '<div class="fld"><label>' + esc(j.nama) + '</label><textarea class="in" rows="3" data-mj="' + esc(j.kode) + '">' + esc((m.persyaratan[j.kode] || []).join('\n')) + '</textarea></div>'; }).join('') + '</div>' +
-    batasCardHtml() + warnaCardHtml() + arcCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div><div class="fld"><label>WhatsApp Super Admin</label><input class="in" id="mWA" inputmode="tel" placeholder="mis. 081234567890" value="' + esc((m.config || {}).wa_superadmin || '') + '"><div class="hint">Mitra yang selesai mendaftar langsung diarahkan ke nomor ini.</div></div></div>');
-  fillBatas();
+    ntfCardHtml() + batasCardHtml() + warnaCardHtml() + arcCardHtml() + '<div class="card"><h3>Layanan bantuan</h3><div class="row2"><div class="fld"><label>Email</label><input class="in" id="mHE" value="' + esc((m.config || {}).helpdesk_email || '') + '"></div><div class="fld"><label>Telepon</label><input class="in" id="mHT" value="' + esc((m.config || {}).helpdesk_telp || '') + '"></div></div><div class="fld"><label>WhatsApp Super Admin</label><input class="in" id="mWA" inputmode="tel" placeholder="mis. 081234567890" value="' + esc((m.config || {}).wa_superadmin || '') + '"><div class="hint">Mitra yang selesai mendaftar langsung diarahkan ke nomor ini.</div></div></div>');
+  fillBatas(); loadNtf();
 }
 /** Baris: "Nama | Deskripsi | nonaktif(opsional)". Id lama dipertahankan bila nama sama. */
 function wilRow(w) { return '<div class="wil-row" data-kode="' + esc(w.kode || '') + '"><span class="chip c-draft" style="min-width:44px;text-align:center">' + esc(w.kode || 'baru') + '</span><input class="in" data-wn placeholder="Nama wilayah UPTD" value="' + esc(w.nama || '') + '"><input class="in" data-wc placeholder="Cakupan (kabupaten/kecamatan)" value="' + esc(w.cakupan || '') + '"></div>'; }
@@ -351,3 +351,32 @@ function init() {
   else { if (pub) S.master = pub; showAuth(); loadPublicMaster(); }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+
+/* ----------------------------- Super Admin: notifikasi WhatsApp & Email (antrean) ----------------------------- */
+function ntfCardHtml() { return '<div class="card" style="margin-bottom:16px" id="ntfCard"><h3>Notifikasi WhatsApp &amp; Email</h3><p class="sub">Pesan masuk antrean lalu dikirim otomatis tiap menit, sehingga aplikasi tidak menunggu.</p><div id="ntfBody"><div class="hint">Memuat…</div></div></div>'; }
+function loadNtf() { api('notif_status').then(renderNtf).catch(function (e) { const b = $('ntfBody'); if (b) b.innerHTML = '<div class="errtxt">' + esc(e.message) + '</div>'; }); }
+function renderNtf(s) {
+  const b = $('ntfBody'); if (!b) return; S.ntf = s;
+  const ev = s.events.map(function (e) { return '<tr><td>' + esc(e.label) + '</td><td style="text-align:center"><input type="checkbox" data-ntw="' + e.kode + '"' + (e.wa ? ' checked' : '') + '></td><td style="text-align:center"><input type="checkbox" data-nte="' + e.kode + '"' + (e.email ? ' checked' : '') + '></td></tr>'; }).join('');
+  const rec = s.terbaru.map(function (r) { return '<tr><td>' + esc(r.kanal) + '</td><td>' + esc(r.tujuan) + '</td><td>' + esc(r.event) + '</td><td><span class="chip ' + (r.status === 'Terkirim' ? 'c-ok' : r.status === 'Gagal' ? 'c-bad' : 'c-draft') + '">' + esc(r.status) + '</span></td><td class="t-sub">' + esc(r.respon || '') + '</td></tr>'; }).join('');
+  b.innerHTML = '<div class="row2"><label class="tick"><input type="checkbox" id="ntWa"' + (s.wa_aktif ? ' checked' : '') + '> WhatsApp aktif</label><label class="tick"><input type="checkbox" id="ntEm"' + (s.email_aktif ? ' checked' : '') + '> Email aktif</label></div>' +
+    '<div class="fld" style="margin-top:10px"><label>Token Fonnte ' + (s.token_ada ? '<span class="chip c-ok">tersimpan</span>' : '<span class="chip c-bad">belum diisi</span>') + '</label><input class="in" id="ntTok" type="password" autocomplete="off" placeholder="' + (s.token_ada ? esc(s.token_samar) + ' (kosongkan bila tidak diganti)' : 'Tempel token dari fonnte.com') + '"><div class="hint">Token disimpan di server (Script Properties), tidak pernah dikirim kembali ke layar ini.' + (s.token_ada ? ' <a href="#" data-act="ntHapus">Hapus token</a>' : '') + '</div></div>' +
+    '<div class="tblwrap" style="margin-top:8px"><table class="tbl"><thead><tr><th>Kejadian</th><th style="text-align:center">WA</th><th style="text-align:center">Email</th></tr></thead><tbody>' + ev + '</tbody></table></div>' +
+    '<div class="btns" style="margin-top:10px"><button class="btn btn-p btn-s" data-act="ntSimpan">Simpan pengaturan</button><button class="btn btn-o btn-s" data-act="ntProses">Proses antrean sekarang</button><button class="btn btn-o btn-s" data-act="ntUlang">Kirim ulang yang gagal</button><button class="btn btn-o btn-s" data-act="ntUji">Kirim pesan uji WA</button></div>' +
+    '<p class="sub" style="margin-top:10px">Antrean: <b>' + s.hitung.Antri + '</b> menunggu · <b>' + s.hitung.Terkirim + '</b> terkirim · <b>' + s.hitung.Gagal + '</b> gagal</p>' +
+    (rec ? '<div class="tblwrap"><table class="tbl"><thead><tr><th>Kanal</th><th>Tujuan</th><th>Kejadian</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>' + rec + '</tbody></table></div>' : '<div class="hint">Belum ada pesan di antrean.</div>');
+}
+function ntfSimpanBody(extra) {
+  const m = {}; document.querySelectorAll('[data-ntw]').forEach(function (c) { m[c.dataset.ntw] = { wa: c.checked, email: false }; });
+  document.querySelectorAll('[data-nte]').forEach(function (c) { (m[c.dataset.nte] = m[c.dataset.nte] || { wa: false }).email = c.checked; });
+  return Object.assign({ wa_aktif: $('ntWa').checked, email_aktif: $('ntEm').checked, token: $('ntTok').value, matriks: m }, extra || {});
+}
+Object.assign(ACT, {
+  ntSimpan: function (el) { loadingBtn(el, true); api('notif_simpan', ntfSimpanBody()).then(function (s) { toast('ok', 'Pengaturan notifikasi disimpan.'); renderNtf(s); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(el, false); }); },
+  ntProses: function (el) { loadingBtn(el, true); api('notif_proses', {}).then(function (s) { toast('ok', s.sibuk ? 'Antrean sedang diproses pemicu, coba lagi sebentar.' : 'Diproses: ' + s.diproses + ' pesan.'); renderNtf(s); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(el, false); }); },
+  ntUlang: function (el) { loadingBtn(el, true); api('notif_proses', { ulang: true }).then(function (s) { toast('ok', 'Pesan gagal dikirim ulang: ' + s.diproses + ' diproses.'); renderNtf(s); }).catch(function (e) { toast('bad', e.message); }).then(function () { loadingBtn(el, false); }); },
+  ntHapus: function () { if (!confirm('Hapus token Fonnte? Pengiriman otomatis berhenti dan kembali ke tombol WhatsApp manual.')) return; api('notif_simpan', { hapus_token: true }).then(function (s) { toast('ok', 'Token dihapus.'); renderNtf(s); }).catch(function (e) { toast('bad', e.message); }); },
+  ntUji: function (el) {
+    modal({ title: 'Kirim pesan uji WhatsApp', body: '<div class="fld"><label>Nomor tujuan</label><input class="in" id="ntNo" inputmode="tel" placeholder="mis. 081234567890"></div><p class="hint">Pesan uji dimasukkan ke antrean lalu langsung diproses.</p>', ok: 'Kirim uji', onOk: function () { return api('notif_proses', { uji: $('ntNo').value }).then(function (s) { renderNtf(s); const t = s.terbaru[0]; toast(t && t.status === 'Terkirim' ? 'ok' : 'bad', t ? 'Hasil uji: ' + t.status + (t.respon ? ' (' + t.respon + ')' : '') : 'Tidak ada hasil.'); }); } });
+  }
+});
