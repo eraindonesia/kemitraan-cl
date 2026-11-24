@@ -115,12 +115,11 @@ function magCard(r) {
 }
 function magGaleri() {
   const root = magEl(); root.hidden = false; document.body.classList.add('mag-open'); root.classList.add('gal');
-  const f = MAG.filter; const L = (MAG.daftar || []).filter(function (r) { return f === 'semua' || r.jenis === f; });
-  const tab = function (k, t) { return '<button class="mg-tab' + (f === k ? ' on' : '') + '" data-mg-f="' + k + '">' + t + '</button>'; };
+  const L = (MAG.daftar || []).filter(function (r) { return r.jenis === 'program'; });
   root.innerHTML = '<div class="mag-pub"><header class="pub-h"><div class="pub-brand"><span class="mg-logo">SI</span><div><b>SI-MITRA KONSERVASI</b><small>DKP Provinsi Sulawesi Tengah</small></div></div><span class="sp"></span><button class="mg-btn ghost" data-mg="masuk"><span class="mi">login</span> Masuk aplikasi</button></header>' +
-    '<section class="pub-hero"><div class="mg-in"><span class="mg-eyebrow">Majalah Digital</span><h1>Kisah kemitraan konservasi <em>Sulawesi Tengah</em></h1><p>Laporan hasil program dari para mitra dan laporan hasil evaluasi dari UPTD. Terbuka untuk siapa saja.</p></div>' + magWaves() + '</section>' +
-    '<main class="pub-m"><div class="pub-tabs">' + tab('semua', 'Semua') + tab('program', 'Hasil Program Mitra') + tab('evaluasi', 'Hasil Evaluasi UPTD') + '</div>' +
-    (MAG.daftar === null ? '<div class="pub-empty">Memuat majalah…</div>' : L.length ? '<div class="mg-gridc">' + L.map(magCard).join('') + '</div>' : '<div class="pub-empty">Belum ada majalah yang diterbitkan' + (f !== 'semua' ? ' pada kategori ini' : '') + '.</div>') + '</main><footer class="pub-f">© Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah</footer></div>';
+    '<section class="pub-hero"><div class="mg-in"><span class="mg-eyebrow">Majalah Digital</span><h1>Kisah kemitraan konservasi <em>Sulawesi Tengah</em></h1><p>Laporan hasil program dari para mitra konservasi. Terbuka untuk siapa saja.</p></div>' + magWaves() + '</section>' +
+    '<main class="pub-m">' +
+    (MAG.daftar === null ? '<div class="pub-empty">Memuat majalah…</div>' : L.length ? '<div class="mg-gridc">' + L.map(magCard).join('') + '</div>' : '<div class="pub-empty">Belum ada majalah yang diterbitkan.</div>') + '</main><footer class="pub-f">© Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah</footer></div>';
   magLoadPhotos(root, false);
 }
 function magRoute() {

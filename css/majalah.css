@@ -113,3 +113,18 @@ body.mag-open{overflow:hidden}
 .dash-mag .mg-card .mt b,.dash-mag .mg-card .mt small{color:var(--tx-1,inherit)}
 .pub-hero .mg-in{max-width:1180px;padding-left:clamp(14px,4vw,40px);padding-right:clamp(14px,4vw,40px)}
 .pub-hero h1{max-width:20ch}
+/* ===== v3.7.1 — ramah HP ===== */
+@media (max-width:999px){
+  .mag-stage{padding-bottom:112px!important}
+  .mag-page{min-height:calc(100svh - 200px)}
+  .mag-nav{bottom:60px!important;width:50px;height:50px}
+  .mag-foot{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+}
+@media (max-width:600px){
+  .mg-gridc{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+  .mg-card .cv{padding:10px;border-radius:6px}.mg-card h3{font-size:15px;line-height:1.15}.mg-card .jn{font-size:9px;letter-spacing:.1em}.mg-card .ed{top:8px;left:8px;font-size:9.5px;padding:3px 8px}
+  .mg-card .mt b{font-size:12.5px}.mg-card .mt small{font-size:11.5px}
+  .pub-h{padding:10px 14px;gap:8px}.pub-h .pub-brand small{display:none}.pub-h .pub-brand b{font-size:13px}.pub-h .mg-btn{padding:8px 12px;font-size:13px;white-space:nowrap}
+  .pub-hero .mg-in{padding-top:28px;padding-bottom:64px}.pub-hero p{font-size:15px}
+  .pub-m{padding-bottom:28px}
+}
