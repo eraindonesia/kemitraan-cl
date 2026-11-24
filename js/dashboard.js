@@ -68,9 +68,11 @@ function showApp() { $('authScreen').hidden = true; $('appShell').hidden = false
 function forceLogout(msg) {
   S.token = null; S.me = null; S.peta = null; S.dok = null; S._sig = null; LS.del('sm_tok'); LS.del('sm_snap'); LS.del('sm_peta'); LS.del('sm_form'); S.det = {}; S.dash = { periode: 'all', kawasan: '' }; S.params = {}; S.stack = []; S.view = '';
   showAuth(); if (msg) $('lgErr').textContent = msg;
+  try { if (msg) location.hash = '#/masuk'; else { history.replaceState(null, '', location.pathname + location.search); magRoute(); } } catch (e) {}
 }
 function afterAuth(r) {
   S.token = r.token; LS.set('sm_tok', r.token); hydrate(r); persist(); showApp(); S.stack = []; S.view = '';
+  try { history.replaceState(null, '', location.pathname + location.search); magClose(); magEl().classList.remove('gal'); } catch (e) {}
   navigateTo('dashboard', {}, { replace: true });
 }
 /** Setelah mendaftar: masuk ke aplikasi lalu arahkan mitra ke WhatsApp Super Admin (bila nomornya diisi). */
