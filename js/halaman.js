@@ -120,6 +120,7 @@ function vDashboard() {
     if (!S._dm) return; S._dm.update(bt, ar);
     const lg = $('dashLeg'); if (lg) lg.innerHTML = (pt.batas.length || ar.length) ? petaLegend() : '<span>Belum ada area/batas yang diunggah.</span>';
   };
+  dashMagFill();
   S._dm = MapKit.overview($('dashMap'), { scroll: false, onOpen: function (id) { navigateTo('detail', { id: id }); } });
   draw(); loadPeta().then(function () { if (S.view === 'dashboard') draw(); }).catch(function (e) { console.warn('peta', e && e.message); });
 }
@@ -148,25 +149,6 @@ function vDokumen() {
 
 /* ----------------------------- Pelaporan Mitra ----------------------------- */
 function pelaporanRows() { return S.monev.map(function (m) { return { m: m, p: pById(m.id_pengajuan) }; }).filter(function (x) { return x.p; }).sort(function (a, b) { return a.m.dibuat < b.m.dibuat ? 1 : -1; }); }
-function vPelaporan() {
-  setTitle('Pelaporan Mitra'); const all = pelaporanRows(); const q = (S.pelQ || '').toLowerCase().trim();
-  const a = all.filter(function (x) { return !q || (x.p.nomor + ' ' + x.p.judul + ' ' + x.p.lembaga + ' ' + x.p.kawasan + ' ' + x.m.periode).toLowerCase().indexOf(q) > -1; });
-  const avg = all.length ? all.reduce(function (s, x) { return s + Number(x.m.capaian_persen || 0); }, 0) / all.length : null;
-  const adaPdf = all.filter(function (x) { return x.m.file; }).length;
-  const rows = a.map(function (x) {
-    return '<tr data-act="bukaMonev" data-id="' + esc(x.p.id) + '"><td class="t-b">' + esc(x.m.periode) + '</td><td><b>' + esc(x.p.judul) + '</b><div class="t-sub">' + esc(x.p.nomor) + ' · ' + esc(x.p.lembaga) + '</div></td><td>' + esc(x.p.kawasan) + '</td><td><span class="chip c-teal">' + esc(x.m.capaian_persen) + '%</span></td><td>' + esc(x.m.pelapor) + '<div class="t-sub">' + fmtD(x.m.dibuat) + '</div></td><td data-stop="1">' + (x.m.file ? fileChip(x.m.file, false) : '<span class="t-sub">Tanpa PDF</span>') + '</td></tr>';
-  }).join('');
-  setView('<div class="ph"><div><h2>Pelaporan Mitra</h2><p>Laporan monitoring & evaluasi kegiatan mitra beserta berkas PDF-nya.</p></div><div class="sp"></div><button class="btn btn-o" data-act="exportMonev">' + mi('download') + ' Ekspor (CSV)</button></div>' +
-    '<div class="kpis"><div class="kpi2"><div class="lb"><span>Total laporan</span></div><div class="vl">' + all.length + '</div></div><div class="kpi2"><div class="lb"><span>Rata-rata capaian</span></div><div class="vl">' + (avg === null ? '–' : numID(avg, 1) + '%') + '</div></div><div class="kpi2"><div class="lb"><span>Dengan berkas PDF</span></div><div class="vl">' + adaPdf + '</div></div></div>' +
-    '<div class="card" style="margin:14px 0;padding:14px"><input id="pelQ" class="in" type="search" placeholder="Cari program, mitra, kawasan, periode…" aria-label="Cari" value="' + esc(S.pelQ || '') + '"></div>' +
-    '<div class="card">' + (a.length ? '<div class="tbl-wrap"><table><thead><tr><th>Periode</th><th>Program / Mitra</th><th>Kawasan</th><th>Capaian</th><th>Pelapor</th><th>Berkas</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<div class="empty" style="padding:24px">' + (all.length ? 'Tidak ada laporan yang cocok.' : 'Belum ada laporan monev. Laporan diisi pada tahap 12 (pelaksanaan) oleh Admin UPTD atau mitra.') + '</div>') + '</div>');
-  const qi = $('pelQ'); if (qi) qi.addEventListener('input', debounce(function () { S.pelQ = this.value; const pos = this.selectionStart; vPelaporan(); const n = $('pelQ'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } }, 150));
-}
-function pelaporanCard(mon) {
-  const last = mon.slice().sort(function (a, b) { return a.dibuat < b.dibuat ? 1 : -1; }).slice(0, 5);
-  const items = last.map(function (m) { const p = pById(m.id_pengajuan); if (!p) return ''; return '<div class="it" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>' + esc(p.judul) + '</b><div class="t-sub">' + esc(p.lembaga) + ' · ' + esc(m.periode) + ' · ' + fmtD(m.dibuat) + '</div></div><span class="chip c-teal">' + esc(m.capaian_persen) + '%</span>' + (m.file ? '<span data-stop="1">' + fileChip(m.file, false) + '</span>' : '') + '</div>'; }).join('');
-  return '<div class="card" style="margin-bottom:16px"><div class="card-h"><div class="ic">' + mi('summarize') + '</div><div><h3>Pelaporan Mitra</h3><p class="sub">' + mon.length + ' laporan monitoring & evaluasi · 5 terbaru</p></div><div class="sp"></div><button class="btn btn-o btn-s" data-act="goPelaporan">Lihat semua</button></div>' + (items || '<div class="empty" style="padding:16px">Belum ada laporan monev.</div>') + '</div>';
-}
 /* ----------------------------- Laporan & Statistik ----------------------------- */
 function vStatistik() {
   setTitle('Laporan & Statistik'); const D = S.daftar.filter(function (p) { return !p._pending; });

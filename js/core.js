@@ -161,7 +161,7 @@ function setTitle(t) { $('pageTitle').textContent = t; document.title = t + ' ·
 function renderView() {
   if (S.view === 'form' && !(S.params && S.params.id) && S.me && S.me.peran !== 'mitra') { S.view = 'dashboard'; S.params = {}; }
   MapKit.disposeAll();
-  const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun, dokumen: vDokumen, statistik: vStatistik, pelaporan: vPelaporan, peta: vPeta, verifikasi: vVerifikasi };
+  const V = { dashboard: vDashboard, daftar: vDaftar, form: vForm, detail: vDetail, users: vUsers, master: vMaster, akun: vAkun, dokumen: vDokumen, statistik: vStatistik, pelaporan: vPelaporan, laporanEdit: vLaporanEdit, peta: vPeta, verifikasi: vVerifikasi };
   (V[S.view] || vDashboard)();
 }
 function setView(html) { $('view').innerHTML = html; }

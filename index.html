@@ -13,9 +13,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/majalah.css">
 </head>
 <body>
 <div id="sync" class="sync" hidden></div>
@@ -99,7 +101,7 @@
         <div id="rgErr" class="errtxt" role="alert" style="margin-bottom:10px"></div>
         <button class="btn btn-p btn-block" id="btnReg" type="submit">Buat akun</button>
       </form>
-      <div class="verif-box"><button class="btn btn-o btn-s" data-act="openVerif"><span class="mi">qr_code_scanner</span> Verifikasi dokumen resmi</button>
+      <div class="verif-box"><button class="btn btn-o btn-s" data-act="openVerif"><span class="mi">qr_code_scanner</span> Verifikasi dokumen resmi</button> <button class="btn btn-o btn-s" data-act="bukaMajalah"><span class="mi">auto_stories</span> Baca majalah laporan</button>
         <div id="helpdesk" style="margin-top:10px"></div></div>
     </div>
   </section>
@@ -113,7 +115,7 @@
       <div><b>SI-MITRA</b><small>DKP SULTENG</small></div></div>
     <button class="side-cta" data-act="newForm" id="qaNew"><span class="mi">add_circle</span><span>Ajukan Usulan Baru</span></button>
     <nav id="nav" class="nav" aria-label="Menu"></nav>
-    <div class="side-ver"><button data-act="bantuan"><span class="mi">help</span>Bantuan &amp; panduan</button><span class="ver">v3.6 · <i id="sbOnline">●</i></span></div>
+    <div class="side-ver"><button data-act="bantuan"><span class="mi">help</span>Bantuan &amp; panduan</button><span class="ver">v3.7 · <i id="sbOnline">●</i></span></div>
   </aside>
   <div class="main">
     <header class="topbar">
@@ -154,5 +156,7 @@
 <script src="js/detail.js"></script>
 <script src="js/actions.js"></script>
 <script src="js/halaman.js"></script>
+<script src="js/majalah.js"></script>
+<script src="js/pelaporan.js"></script>
 </body>
 </html>
