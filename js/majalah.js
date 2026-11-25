@@ -73,7 +73,7 @@ function magBuild(m) {
     const items = []; pages.forEach(function (pg, i) { if (pg.k === 'cover' || pg.k === 'back') return; let t = judul[pg.k]; if (pg.k === 'keg') { t = (isi.kegiatan[kg] || {}).judul || 'Sorotan kegiatan'; kg++; } if (pg.k === 'gal' && items.some(function (x) { return x.k === 'gal'; })) return; items.push({ k: pg.k, t: t, i: i + 1 }); });
     pages.splice(1, 0, { k: 'toc', html: '<div class="mg-pg"><div class="mg-eyebrow">Dalam edisi ini</div><h2>Daftar isi</h2><ol class="mg-toc">' + items.map(function (x, n) { return '<li><button data-mg-pg="' + x.i + '"><span class="n">' + String(n + 1).padStart(2, '0') + '</span><span class="t">' + esc(x.t) + '</span><span class="p">' + (x.i + 1) + '</span></button></li>'; }).join('') + '</ol></div>' });
   }
-  pages.run = []; pages.forEach(function (pg, i) { if (pg.k === 'keg' && pg.t) pages.run.push({ t: pg.t, pg: i }); });
+  pages.run = []; let kr = 0; pages.forEach(function (pg, i) { if (pg.k === 'keg') { const k = (isi.kegiatan || [])[kr++] || {}; const t = String(k.sorotan || '').trim() || magKalimat(k.teks) || k.judul || ''; if (t) pages.run.push({ t: t, by: k.judul && k.judul !== t ? k.judul : '', pg: i }); } });
   pages.push({ k: 'back', html: '<div class="mg-back"><div class="mg-in"><b class="mg-logo">SI-MITRA</b><p>Portal Kemitraan Kawasan Konservasi</p><h3>Dinas Kelautan dan Perikanan<br>Provinsi Sulawesi Tengah</h3><div class="mg-meta">' + esc(J.nama) + ' · Edisi ' + esc((m.edisi ? String(m.edisi).padStart(2, '0') : '—')) + '<br>Terbit ' + esc(tgl) + '</div><button class="mg-btn" data-mg="share">Salin tautan majalah</button><button class="mg-btn ghost" data-mg="top">Kembali ke sampul</button></div>' + magWaves() + '</div>' });
   return pages;
 }
@@ -141,7 +141,7 @@ function magCards(L, q) {
   const F = L.filter(function (r) { return !q || (r.judul + ' ' + r.lembaga + ' ' + r.kawasan + ' ' + r.periode + ' ' + (r.ringkas || '')).toLowerCase().indexOf(q) > -1; });
   return F.length ? F.map(magCard).join('') : '<div class="pub-empty">Tidak ada edisi yang cocok dengan pencarian.</div>';
 }
-function magRunAll(L) { const o = []; L.forEach(function (r) { (r.keg || []).forEach(function (t) { if (o.length < 24) o.push({ t: t, by: r.lembaga, href: '#/majalah/' + r.id }); }); }); return o; }
+function magRunAll(L) { const o = []; L.forEach(function (r) { (r.keg || []).forEach(function (k) { if (typeof k === 'string') k = { j: k, s: '' }; const t = k.s || k.j; if (t && o.length < 24) o.push({ t: t, by: (k.s && k.j ? k.j + ' · ' : '') + r.lembaga, href: '#/majalah/' + r.id }); }); }); return o; }
 function magGaleri() {
   const root = magEl(); root.hidden = false; document.body.classList.add('mag-open'); root.classList.add('gal');
   const L = (MAG.daftar || []).filter(function (r) { return r.jenis === 'program'; }), top = L[0];

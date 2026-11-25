@@ -32,7 +32,9 @@ function lapCardHtml(r) {
   const own = lapBisaEdit(r), staf = can(['admin', 'uptd']);
   const b = [];
   b.push('<button class="btn btn-o btn-s" data-act="lapBaca" data-id="' + esc(r.id) + '">' + mi('auto_stories') + ' Baca</button>');
-  if (own) b.push('<button class="btn btn-p btn-s" data-act="lapEdit" data-id="' + esc(r.id) + '">' + mi('edit') + ' ' + (r.status === 'Draf' ? 'Sunting' : 'Sunting (Super Admin)') + '</button>');
+  const mitraPemilik = r.jenis === 'program' && can(['mitra']);
+  if (own) b.push('<button class="btn btn-p btn-s" data-act="lapEdit" data-id="' + esc(r.id) + '">' + mi('edit') + ' ' + (r.status === 'Draf' ? 'Edit laporan' : 'Sunting (Super Admin)') + '</button>');
+  else if (mitraPemilik && r.status !== 'Draf') b.push('<button class="btn btn-p btn-s" data-act="lapRevisi" data-s="' + esc(r.status) + '" data-id="' + esc(r.id) + '">' + mi('edit') + ' Edit laporan</button>');
   if (r.jenis === 'program' && r.status === 'Draf' && can(['mitra'])) b.push('<button class="btn btn-o btn-s" data-act="lapAksi" data-a="ajukan" data-id="' + esc(r.id) + '">' + mi('send') + ' Ajukan terbit</button>');
   if (staf && ((r.jenis === 'program' && r.status === 'Diajukan') || (r.jenis === 'evaluasi' && r.status === 'Draf') || (isSuper() && r.status === 'Draf'))) b.push('<button class="btn btn-p btn-s" data-act="lapAksi" data-a="terbit" data-j="' + r.jenis + '" data-id="' + esc(r.id) + '">' + mi('publish') + (r.jenis === 'evaluasi' ? ' Finalkan' : ' Terbitkan') + '</button>');
   if (staf && r.status !== 'Draf') b.push('<button class="btn btn-o btn-s" data-act="lapAksi" data-a="tarik" data-id="' + esc(r.id) + '">' + mi('undo') + ' ' + (r.status === 'Terbit' ? 'Tarik dari publik' : 'Kembalikan ke draf') + '</button>');
@@ -102,7 +104,7 @@ function lapEdRender() {
   const foto = d.foto || [];
   const fotoOpt = function (sel) { return '<option value="">— tanpa foto —</option>' + foto.map(function (f) { return '<option value="' + esc(f.id) + '"' + (sel === f.id ? ' selected' : '') + '>' + esc(f.nama) + '</option>'; }).join(''); };
   const keg = (isi.kegiatan && isi.kegiatan.length ? isi.kegiatan : []).map(function (k, i) {
-    return '<div class="lp-keg" data-i="' + i + '"><div class="lp-kh"><b>' + L.keg + ' ' + (i + 1) + '</b>' + (ro ? '' : '<button type="button" class="btn btn-o btn-s" data-act="lapKegDel" data-i="' + i + '" aria-label="Hapus">' + mi('delete') + '</button>') + '</div><div class="fld"><label>Judul</label><input class="in" data-k="judul" maxlength="100" value="' + esc(k.judul) + '"' + dis + '></div><div class="fld"><label>Uraian</label><textarea class="in" data-k="teks" rows="3" maxlength="1200"' + dis + '>' + esc(k.teks) + '</textarea></div><div class="fld"><label>Foto</label><select class="in" data-k="foto"' + dis + '>' + fotoOpt(k.foto) + '</select></div></div>';
+    return '<div class="lp-keg" data-i="' + i + '"><div class="lp-kh"><b>' + L.keg + ' ' + (i + 1) + '</b>' + (ro ? '' : '<button type="button" class="btn btn-o btn-s" data-act="lapKegDel" data-i="' + i + '" aria-label="Hapus">' + mi('delete') + '</button>') + '</div><div class="fld"><label>Judul</label><input class="in" data-k="judul" maxlength="100" value="' + esc(k.judul) + '"' + dis + '></div><div class="fld"><label>Sorotan <span class="t-sub">(1 kalimat untuk teks berjalan di majalah; boleh dikosongkan)</span></label><input class="in" data-k="sorotan" maxlength="140" placeholder="mis. 1.200 fragmen karang berhasil ditransplantasi" value="' + esc(k.sorotan || '') + '"' + dis + '></div><div class="fld"><label>Uraian</label><textarea class="in" data-k="teks" rows="3" maxlength="1200"' + dis + '>' + esc(k.teks) + '</textarea></div><div class="fld"><label>Foto</label><select class="in" data-k="foto"' + dis + '>' + fotoOpt(k.foto) + '</select></div></div>';
   }).join('');
   const gset = {}; (isi.galeri || []).forEach(function (g) { gset[g.id] = g.ket; });
   const gal = foto.map(function (f) { const on = gset[f.id] !== undefined; return '<label class="lp-g"><input type="checkbox" data-g="' + esc(f.id) + '"' + (on ? ' checked' : '') + dis + '><div class="lp-th" data-foto="' + esc(f.id) + '"></div><input class="in" data-gk="' + esc(f.id) + '" placeholder="Keterangan foto" maxlength="120" value="' + esc(gset[f.id] || '') + '"' + dis + '></label>'; }).join('');
@@ -124,7 +126,7 @@ function lapEdCollect() {
   d.judul = v('lpJ'); d.periode = v('lpP'); d.capaian_persen = v('lpC'); isi.ringkasan = v('lpR');
   ['lpD', 'dampak', 'lpK', 'kendala', 'lpRek', 'rekomendasi', 'lpKes', 'kesimpulan'].forEach(function (x, i, a) { if (i % 2 === 0 && $(x)) isi[a[i + 1]] = $(x).value; });
   isi.sampul = v('lpS') || '';
-  isi.kegiatan = Array.prototype.map.call(document.querySelectorAll('#lpKeg .lp-keg'), function (el) { const g = function (k) { return el.querySelector('[data-k="' + k + '"]').value; }; return { judul: g('judul'), teks: g('teks'), foto: g('foto') }; });
+  isi.kegiatan = Array.prototype.map.call(document.querySelectorAll('#lpKeg .lp-keg'), function (el) { const g = function (k) { return el.querySelector('[data-k="' + k + '"]').value; }; return { judul: g('judul'), sorotan: g('sorotan'), teks: g('teks'), foto: g('foto') }; });
   isi.galeri = Array.prototype.filter.call(document.querySelectorAll('.lp-galsel [data-g]'), function (c) { return c.checked; }).map(function (c) { const k = document.querySelector('[data-gk="' + c.dataset.g + '"]'); return { id: c.dataset.g, ket: k ? k.value : '' }; });
 }
 function lapEdPayload() { const d = S.lapEd.d; return { id: d.id, judul: d.judul, periode: d.periode, capaian_persen: d.capaian_persen, isi: d.isi }; }
@@ -141,6 +143,10 @@ Object.assign(ACT, {
     modal({ title: 'Buat ' + LAP_J[j].nama, body: '<div class="fld"><label>Usulan / program <i>*</i></label><select class="in" id="lbP">' + el12.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nomor + ' — ' + p.judul + ' (' + p.lembaga + ')') + '</option>'; }).join('') + '</select></div><div class="fld"><label>Judul majalah <i>*</i></label><input class="in" id="lbJ" maxlength="120" placeholder="mis. Menjaga Terumbu Karang Teluk Tomini"></div><div class="fld"><label>Periode</label><input class="in" id="lbT" maxlength="40" placeholder="mis. Triwulan I 2026"></div>', ok: 'Buat & isi',
       onOk: function () { const jd = $('lbJ').value.trim(); if (!jd) { $('mErr').textContent = 'Judul wajib diisi.'; return false; } return api('laporan_simpan', { jenis: j, id_pengajuan: $('lbP').value, judul: jd, periode: $('lbT').value }).then(function (r) { S.lapEd = { d: r }; S.lap = null; S._lapFresh = false; closeModal(); navigateTo('laporanEdit', { id: r.id }); }); } });
   },
+  lapRevisi: function (el) {
+    const terbit = el.dataset.s === 'Terbit', id = el.dataset.id;
+    modal({ title: 'Edit laporan?', body: '<p>' + (terbit ? 'Laporan ini sedang <b>terbit di majalah</b>. Agar bisa diedit, laporan akan <b>ditarik dari majalah publik</b> dan kembali menjadi Draf.' : 'Laporan ini sedang menunggu persetujuan Admin UPTD. Agar bisa diedit, laporan akan kembali menjadi Draf.') + '</p><p class="t-sub">Setelah selesai mengedit, tekan <b>Ajukan terbit</b> lagi. ' + (terbit ? 'Nomor edisi tetap sama.' : '') + '</p>', ok: 'Ya, edit laporan', onOk: function () { return api('laporan_aksi', { id: id, aksi: 'revisi' }).then(function () { S.lap = null; S._lapFresh = false; MAG.daftar = null; S.lapEd = null; navigateTo('laporanEdit', { id: id }); }); } });
+  },
   lapEdit: function (el) { S.lapEd = null; navigateTo('laporanEdit', { id: el.dataset.id }); },
   lapKembali: function () { S.lapEd = null; navigateTo('pelaporan'); },
   lapBaca: function (el) { api('laporan_baca', { id: el.dataset.id }).then(function (d) { magOpenReader(d, { preview: d.status !== 'Terbit' }); }).catch(function (e) { toast('bad', e.message); }); },
@@ -152,7 +158,7 @@ Object.assign(ACT, {
     modal({ title: tx[0], body: '<p>' + tx[1] + '</p>', ok: tx[2], onOk: function () { return api('laporan_aksi', { id: el.dataset.id, aksi: a }).then(function () { S.lap = null; S._lapFresh = false; MAG.daftar = null; closeModal(); toast('ok', a === 'ajukan' ? 'Laporan diajukan.' : a === 'terbit' ? (ev ? 'Evaluasi difinalkan.' : 'Majalah terbit.') : 'Laporan ditarik.'); if (S.view === 'pelaporan') vPelaporan(); }); } });
   },
   lapHapus: function (el) { modal({ title: 'Hapus laporan?', body: '<p>Laporan beserta foto-fotonya dihapus permanen.</p>', ok: 'Hapus', danger: true, onOk: function () { return api('laporan_hapus', { id: el.dataset.id }).then(function () { S.lap = null; S._lapFresh = false; MAG.daftar = null; closeModal(); toast('ok', 'Laporan dihapus.'); if (S.view === 'laporanEdit') { S.lapEd = null; navigateTo('pelaporan'); } else vPelaporan(); }); } }); },
-  lapKegAdd: function () { lapEdCollect(); const i = S.lapEd.d.isi; i.kegiatan = (i.kegiatan || []).concat([{ judul: '', teks: '', foto: '' }]); lapEdRender(); },
+  lapKegAdd: function () { lapEdCollect(); const i = S.lapEd.d.isi; i.kegiatan = (i.kegiatan || []).concat([{ judul: '', sorotan: '', teks: '', foto: '' }]); lapEdRender(); },
   lapKegDel: function (el) { lapEdCollect(); const i = S.lapEd.d.isi; i.kegiatan.splice(+el.dataset.i, 1); lapEdRender(); },
   lapSimpan: function (el) { lapEdSave(el).then(function () { toast('ok', 'Draf tersimpan.'); lapEdRender(); }).catch(function () {}); },
   lapPratinjau: function (el) { const go = function () { magOpenReader(S.lapEd.d, { preview: true }); }; if (S.lapEd.d.boleh_edit) lapEdSave(el).then(function () { lapEdRender(); go(); }).catch(function () {}); else go(); },
