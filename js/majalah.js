@@ -29,22 +29,37 @@ function magGauge(pct) {
 function magWaves() { return '<svg class="mg-waves" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40 Q50 10 100 40 T200 40 T300 40 T400 40 V120 H0Z" opacity=".18"/><path d="M0 62 Q50 32 100 62 T200 62 T300 62 T400 62 V120 H0Z" opacity=".22"/><path d="M0 84 Q50 54 100 84 T200 84 T300 84 T400 84 V120 H0Z" opacity=".3"/></svg>'; }
 function magFig(id, ket, cls) { return '<figure class="mg-ph ' + (cls || '') + '"><div class="img" data-foto="' + esc(id) + '"></div>' + (ket ? '<figcaption>' + esc(ket) + '</figcaption>' : '') + '</figure>'; }
 
+function magKalimat(t) { t = String(t || '').replace(/\s+/g, ' ').trim(); const m = t.match(/^(.{40,230}?[.!?])(\s|$)/); return m ? m[1] : ''; }
+function magSisa(t, k) { t = String(t || '').trim(); return k && t.indexOf(k) === 0 ? t.slice(k.length).trim() : t; }
+function magRun(items, cls, label) {
+  if (!items.length) return '';
+  const set = items.map(function (x) { return (x.href ? '<a href="' + esc(x.href) + '"' : '<button data-mg-pg="' + x.pg + '"') + ' class="ri"><i></i><b>' + esc(x.t) + '</b>' + (x.by ? '<span>' + esc(x.by) + '</span>' : '') + (x.href ? '</a>' : '</button>'); }).join('');
+  const dur = Math.max(20, Math.round(items.reduce(function (n, x) { return n + x.t.length + (x.by || '').length; }, 0) * .42));
+  return '<div class="mag-run ' + cls + '" role="region" aria-label="' + esc(label) + '"><div class="lb"><span class="mi">bolt</span>' + esc(label) + '</div><div class="vp"><div class="trk" style="animation-duration:' + dur + 's">' + set + set + '</div></div></div>';
+}
+
 /** Menyusun halaman majalah dari data laporan. */
 function magBuild(m) {
   const isi = m.isi || {}, ev = m.jenis === 'evaluasi', J = MAG_JENIS[m.jenis] || MAG_JENIS.program, pages = [];
   const sampul = isi.sampul || ((isi.kegiatan || []).filter(function (k) { return k.foto; })[0] || {}).foto || ((isi.galeri || [])[0] || {}).id || '';
   const tgl = m.terbit ? fmtD(m.terbit) : 'Pratinjau';
-  pages.push({ k: 'cover', html: '<div class="mg-cover">' + (sampul ? '<div class="mg-bgimg" data-foto="' + esc(sampul) + '"></div>' : magWaves()) + '<div class="mg-shade"></div><div class="mg-in"><div class="mg-mast"><b>SI-MITRA</b><span>' + esc(J.nama) + '</span></div><div class="mg-mid"><div class="mg-badge">Edisi ' + esc((m.edisi ? String(m.edisi).padStart(2, '0') : '—')) + (m.periode ? ' · ' + esc(m.periode) : '') + '</div><h1>' + esc(m.judul) + '</h1><p class="mg-kicker">' + esc(m.kawasan) + '</p></div><div class="mg-cue">Geser atau tekan panah untuk membaca <span class="mi">arrow_forward</span></div><div class="mg-by"><span>' + esc(ev ? 'Dinas Kelautan dan Perikanan · ' + (m.wilayah_nama || 'UPTD') : m.lembaga) + '</span><span>' + esc(tgl) + '</span></div></div></div>' });
+  pages.push({ k: 'cover', html: '<div class="mg-cover">' + (sampul ? '<div class="mg-bgimg" data-foto="' + esc(sampul) + '"></div>' : magWaves()) + '<div class="mg-shade"></div><div class="mg-in"><div class="mg-mast"><b>SI-MITRA</b><span>' + esc(J.nama) + '</span></div><div class="mg-mid"><div class="mg-badge">Edisi ' + esc((m.edisi ? String(m.edisi).padStart(2, '0') : '—')) + (m.periode ? ' · ' + esc(m.periode) : '') + '</div><h1>' + esc(m.judul) + '</h1><p class="mg-kicker">' + esc(m.kawasan) + '</p></div>' + (function () { const ks = (isi.kegiatan || []).filter(function (k) { return k.judul; }).slice(0, 3); return ks.length ? '<ul class="mg-lines">' + ks.map(function (k, i) { return '<li><b>' + String(i + 1).padStart(2, '0') + '</b>' + esc(k.judul) + '</li>'; }).join('') + '</ul>' : ''; })() + '<div class="mg-cue">Geser atau tekan panah untuk membaca <span class="mi">arrow_forward</span></div><div class="mg-by"><span>' + esc(ev ? 'Dinas Kelautan dan Perikanan · ' + (m.wilayah_nama || 'UPTD') : m.lembaga) + '</span><span>' + esc(tgl) + '</span></div></div></div>' });
   // Ringkasan
   const stat = '<div class="mg-stats"><div><small>Kawasan</small><b>' + esc(m.kawasan || '-') + '</b></div><div><small>' + (ev ? 'Wilayah UPTD' : 'Mitra pelaksana') + '</small><b>' + esc(ev ? (m.wilayah_nama || '-') : (m.lembaga || '-')) + '</b></div>' + (m.periode ? '<div><small>Periode</small><b>' + esc(m.periode) + '</b></div>' : '') + (m.capaian_persen !== '' && m.capaian_persen !== undefined && !ev ? '<div><small>Capaian</small><b>' + esc(m.capaian_persen) + '%</b></div>' : '') + '</div>';
-  pages.push({ k: 'edit', html: '<div class="mg-pg"><div class="mg-eyebrow">' + (ev ? 'Ringkasan Evaluasi' : 'Dari Lapangan') + '</div><h2>' + esc(ev ? 'Gambaran umum hasil evaluasi' : 'Ringkasan kegiatan') + '</h2><div class="mg-dropcap">' + magPara(isi.ringkasan) + '</div>' + stat + '</div>' });
+  const kal = magKalimat(isi.ringkasan);
+  pages.push({ k: 'edit', html: '<div class="mg-pg mg-ed"><div class="mg-kick"><span class="mg-eyebrow">' + (ev ? 'Ringkasan Evaluasi' : 'Dari Lapangan') + '</span><span class="mg-issue">Edisi ' + esc(m.edisi ? String(m.edisi).padStart(2, '0') : '—') + (m.periode ? ' · ' + esc(m.periode) : '') + '</span></div><h2 class="mg-hl">' + esc(m.judul) + '</h2>' + (kal ? '<p class="mg-deck">' + esc(kal) + '</p>' : '') + '<div class="mg-cols mg-dropcap">' + magPara(magSisa(isi.ringkasan, kal) || isi.ringkasan) + '</div>' + stat + '</div>' });
   if (ev && m.capaian_persen !== '' && m.capaian_persen !== undefined) pages.push({ k: 'nilai', html: '<div class="mg-pg center"><div class="mg-eyebrow">Penilaian</div><h2>Capaian kinerja kemitraan</h2>' + magGauge(m.capaian_persen) + '<div class="mg-nilai">' + esc(magNilai(m.capaian_persen)) + '</div>' + (isi.kesimpulan ? '<blockquote>' + esc(isi.kesimpulan) + '</blockquote>' : '') + '</div>' });
+  const nk = (isi.kegiatan || []).length;
   (isi.kegiatan || []).forEach(function (k, i) {
-    pages.push({ k: 'keg', html: '<div class="mg-pg mg-keg"><div class="mg-eyebrow">' + (ev ? 'Temuan' : 'Sorotan kegiatan') + '</div>' + (k.foto ? magFig(k.foto, '', 'big') : '') + '<span class="mg-num">' + String(i + 1).padStart(2, '0') + '</span><h2>' + esc(k.judul) + '</h2>' + magPara(k.teks) + '</div>' });
+    const q = magKalimat(k.teks), v = i % 2 ? 'b' : 'a', no = String(i + 1).padStart(2, '0');
+    const kop = '<div class="mg-kick"><span class="mg-eyebrow">' + (ev ? 'Temuan' : 'Sorotan kegiatan') + '</span><span class="mg-issue">' + no + ' / ' + String(nk).padStart(2, '0') + '</span></div>';
+    const foto = k.foto ? magFig(k.foto, '', 'big') : '';
+    const body = (q && String(k.teks).length > 200 ? '<blockquote class="mg-pull">' + esc(q) + '</blockquote>' : '') + '<div class="mg-cols mg-dropcap">' + magPara(q && String(k.teks).length > 200 ? magSisa(k.teks, q) : k.teks) + '</div>';
+    pages.push({ k: 'keg', t: k.judul, html: '<div class="mg-pg mg-keg v' + v + '">' + (v === 'a' ? '<div class="mg-hero">' + foto + '<span class="mg-num">' + no + '</span></div>' + kop + '<h2>' + esc(k.judul) + '</h2>' : kop + '<h2>' + esc(k.judul) + '</h2><span class="mg-num inl">' + no + '</span>' + foto) + body + '</div>' });
   });
   const gal = (isi.galeri || []);
   for (let i = 0; i < gal.length; i += 4) {
-    pages.push({ k: 'gal', html: '<div class="mg-pg"><div class="mg-eyebrow">Galeri</div><h2>' + (i === 0 ? 'Potret kegiatan' : 'Potret kegiatan (lanjutan)') + '</h2><div class="mg-grid">' + gal.slice(i, i + 4).map(function (g) { return magFig(g.id, g.ket, ''); }).join('') + '</div></div>' });
+    pages.push({ k: 'gal', html: '<div class="mg-pg"><div class="mg-eyebrow">Galeri</div><h2>' + (i === 0 ? 'Potret kegiatan' : 'Potret kegiatan (lanjutan)') + '</h2><div class="mg-grid mosaic n' + gal.slice(i, i + 4).length + '">' + gal.slice(i, i + 4).map(function (g) { return magFig(g.id, g.ket, ''); }).join('') + '</div></div>' });
   }
   const blok = [];
   if (!ev && isi.dampak) blok.push(['Dampak & manfaat', isi.dampak]);
@@ -58,6 +73,7 @@ function magBuild(m) {
     const items = []; pages.forEach(function (pg, i) { if (pg.k === 'cover' || pg.k === 'back') return; let t = judul[pg.k]; if (pg.k === 'keg') { t = (isi.kegiatan[kg] || {}).judul || 'Sorotan kegiatan'; kg++; } if (pg.k === 'gal' && items.some(function (x) { return x.k === 'gal'; })) return; items.push({ k: pg.k, t: t, i: i + 1 }); });
     pages.splice(1, 0, { k: 'toc', html: '<div class="mg-pg"><div class="mg-eyebrow">Dalam edisi ini</div><h2>Daftar isi</h2><ol class="mg-toc">' + items.map(function (x, n) { return '<li><button data-mg-pg="' + x.i + '"><span class="n">' + String(n + 1).padStart(2, '0') + '</span><span class="t">' + esc(x.t) + '</span><span class="p">' + (x.i + 1) + '</span></button></li>'; }).join('') + '</ol></div>' });
   }
+  pages.run = []; pages.forEach(function (pg, i) { if (pg.k === 'keg' && pg.t) pages.run.push({ t: pg.t, pg: i }); });
   pages.push({ k: 'back', html: '<div class="mg-back"><div class="mg-in"><b class="mg-logo">SI-MITRA</b><p>Portal Kemitraan Kawasan Konservasi</p><h3>Dinas Kelautan dan Perikanan<br>Provinsi Sulawesi Tengah</h3><div class="mg-meta">' + esc(J.nama) + ' · Edisi ' + esc((m.edisi ? String(m.edisi).padStart(2, '0') : '—')) + '<br>Terbit ' + esc(tgl) + '</div><button class="mg-btn" data-mg="share">Salin tautan majalah</button><button class="mg-btn ghost" data-mg="top">Kembali ke sampul</button></div>' + magWaves() + '</div>' });
   return pages;
 }
@@ -89,6 +105,7 @@ function magOpenReader(data, opt) {
   const J = MAG_JENIS[data.jenis] || MAG_JENIS.program;
   root.innerHTML = '<div class="mag mag-' + J.warna + '"><header class="mag-bar"><button class="mg-ic" data-mg="close" aria-label="' + (opt.preview ? 'Tutup pratinjau' : 'Tutup') + '"><span class="mi">' + (opt.preview ? 'close' : 'arrow_back') + '</span></button><div class="t"><small>' + esc(J.nama) + (opt.preview ? ' · PRATINJAU' : '') + '</small><b>' + esc(data.judul) + '</b></div><span class="sp"></span>' + (opt.preview ? '' : '<button class="mg-ic" data-mg="share" aria-label="Salin tautan" title="Salin tautan"><span class="mi">link</span></button>') + '<button class="mg-ic" data-mg="print" aria-label="Cetak atau simpan PDF" title="Cetak / simpan PDF"><span class="mi">print</span></button></header>' +
     '<div class="mag-stage"><button class="mag-nav prev" data-mg="prev" aria-label="Halaman sebelumnya"><span class="mi">chevron_left</span></button><div class="mag-book"></div><button class="mag-nav next" data-mg="next" aria-label="Halaman berikutnya"><span class="mi">chevron_right</span></button></div>' +
+    magRun(MAG.pages.run || [], 'rd', 'Sorotan kegiatan') +
     '<footer class="mag-foot"><span class="pn"></span><div class="bar"><i></i></div><small class="hint">Geser atau gunakan tombol panah</small></footer></div>';
   magShow(0, 0); root.querySelector('.mag-book').focus && root.querySelector('.mag-book').setAttribute('tabindex', '0');
 }
@@ -124,6 +141,7 @@ function magCards(L, q) {
   const F = L.filter(function (r) { return !q || (r.judul + ' ' + r.lembaga + ' ' + r.kawasan + ' ' + r.periode + ' ' + (r.ringkas || '')).toLowerCase().indexOf(q) > -1; });
   return F.length ? F.map(magCard).join('') : '<div class="pub-empty">Tidak ada edisi yang cocok dengan pencarian.</div>';
 }
+function magRunAll(L) { const o = []; L.forEach(function (r) { (r.keg || []).forEach(function (t) { if (o.length < 24) o.push({ t: t, by: r.lembaga, href: '#/majalah/' + r.id }); }); }); return o; }
 function magGaleri() {
   const root = magEl(); root.hidden = false; document.body.classList.add('mag-open'); root.classList.add('gal');
   const L = (MAG.daftar || []).filter(function (r) { return r.jenis === 'program'; }), top = L[0];
@@ -140,7 +158,7 @@ function magGaleri() {
     (MAG.daftar === null ? '<div class="pub-empty">Memuat majalah…</div>' : L.length ? '<div class="mg-gridc" id="lpGrid">' + magCards(L, MAG.q) + '</div>' : '<div class="pub-empty">Belum ada majalah yang diterbitkan.</div>') + '</section>' +
     '<section id="lpTentang" class="lp-sec"><div class="lp-h"><div><span class="mg-eyebrow dk">Mengapa membaca</span><h2>Laporan yang bercerita</h2></div></div><div class="lp-feat3"><div><span class="mi">photo_camera</span><b>Dari lapangan</b><p>Foto dan kisah langsung dari lokasi kegiatan para mitra.</p></div><div><span class="mi">insights</span><b>Capaian terukur</b><p>Dampak, kendala, dan rencana tindak lanjut disajikan apa adanya.</p></div><div><span class="mi">public</span><b>Terbuka untuk siapa saja</b><p>Tanpa login. Bagikan tautan edisi ke rekan, media, atau masyarakat.</p></div></div></section>' +
     '<section id="lpMitra" class="lp-band"><div class="lp-bin"><div><span class="mg-eyebrow">Ingin kegiatan Anda terbit di sini?</span><h2>Bermitra dengan DKP Sulawesi Tengah</h2><p>Ajukan kemitraan, laksanakan program, lalu laporkan hasilnya. Laporan yang disetujui terbit sebagai edisi majalah.</p></div><ol class="lp-steps"><li><b>1</b>Ajukan kemitraan</li><li><b>2</b>Telaah &amp; kesepakatan</li><li><b>3</b>Laksanakan program</li><li><b>4</b>Laporan terbit</li></ol><div class="lp-btns">' + (dalamApp ? '<button class="mg-btn lg" data-mg="app">Kembali ke aplikasi</button>' : '<button class="mg-btn lg" data-mg="masuk"><span class="mi">login</span> Masuk / Daftar mitra</button>') + '</div></div></section></main>' +
-    '<footer class="pub-f">© Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah · SI-MITRA KONSERVASI</footer></div>';
+    '<footer class="pub-f">© Dinas Kelautan dan Perikanan Provinsi Sulawesi Tengah · SI-MITRA KONSERVASI</footer>' + magRun(magRunAll(L), 'lpr', 'Kegiatan terbaru') + '</div>';
   magLoadPhotos(root, false);
 }
 function magRoute() {
