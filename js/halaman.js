@@ -256,10 +256,10 @@ function afterDetailRender() {
 function openAreaModal(p, area) {
   const open = function () {
     let ed = null;
-    modal({ title: area ? 'Ubah area pengelolaan' : 'Tambah area pengelolaan', wide: true, ok: 'Simpan area', sub: 'Kawasan: <b>' + esc(p.kawasan) + '</b>. Unggah Shapefile (.zip) area kegiatan Anda.',
+    modal({ title: area ? 'Ubah area pengelolaan' : 'Tambah area pengelolaan', wide: true, ok: 'Simpan area', sub: 'Kawasan: <b>' + esc(p.kawasan) + '</b>. Unggah Shapefile (.zip) atau KML/KMZ area kegiatan Anda.',
       body: '<div class="fld"><label>Nama area</label><input class="in" id="arNama" maxlength="80" placeholder="mis. Zona pemanfaatan Pantai Utara" value="' + esc(area ? area.nama : '') + '"></div><div id="arMap"></div>',
       onOk: function () {
-        const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Unggah Shapefile area terlebih dahulu.'; return false; }
+        const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Unggah Shapefile atau KML/KMZ area terlebih dahulu.'; return false; }
         return api('area_simpan', { id_pengajuan: p.id, id: area ? area.id : undefined, nama: $('arNama').value, geojson: g }).then(function () { S.peta = null; delete S.det[p.id]; toast('ok', 'Area tersimpan.'); loadDetail(p.id, true); });
       } });
     ed = MapKit.editor($('arMap'), { geom: area ? area.geojson : null, kawasan: p.kawasan, batas: S.peta ? S.peta.batas : [], modal: true, shpOnly: true, maxChars: 40000 });
@@ -292,7 +292,7 @@ function arcCardHtml() {
   return '<div class="card" style="margin-bottom:16px"><h3>Integrasi ArcGIS Online</h3><p class="sub">Tampilkan layer ArcGIS Online (publik) sebagai lapisan di semua peta — pilih lewat ikon lapisan di pojok peta. Layer fitur (<code>…/FeatureServer/0</code>) dimuat sebagai poligon berwarna per kolom kategori; layer tile (<code>…/MapServer</code>) sebagai peta latar. Layer yang sama bisa diimpor sebagai batas/area lewat tombol <i>Isi koordinat / Impor</i>. Hanya layer berbagi <b>Publik</b> dari <code>*.arcgis.com</code>.</p><div id="arcList">' + L.map(function (l) { return '<div class="arc-row">' + arcRow(l) + '</div>'; }).join('') + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-o btn-s" data-act="arcAdd">' + mi('add') + ' Tambah layer</button><button type="button" class="btn btn-o btn-s" data-act="exportGeo">' + mi('download') + ' Ekspor batas &amp; area (GeoJSON untuk ArcGIS)</button></div><p class="hint" style="margin-top:8px">Klik <b>Simpan semua</b> di atas setelah mengubah daftar layer.</p></div>';
 }
 function batasCardHtml() {
-  return '<div class="card" style="margin-bottom:16px"><h3>Batas kawasan di peta</h3><p class="sub">Unggah batas tiap kawasan (Shapefile .zip, GeoJSON, atau gambar manual). Digunakan untuk memeriksa kesesuaian area usulan.</p><div id="batasList">' + skel() + '</div></div>';
+  return '<div class="card" style="margin-bottom:16px"><h3>Batas kawasan di peta</h3><p class="sub">Unggah batas tiap kawasan (Shapefile .zip, KML/KMZ, GeoJSON, atau gambar manual). Digunakan untuk memeriksa kesesuaian area usulan.</p><div id="batasList">' + skel() + '</div></div>';
 }
 function fillBatas() {
   const el = $('batasList'); if (!el) return;
@@ -301,7 +301,7 @@ function fillBatas() {
 }
 function openBatasModal(kaw) {
   const b = S.peta && S.peta.batas.filter(function (x) { return x.kawasan === kaw; })[0]; let ed = null;
-  modal({ title: 'Batas kawasan: ' + kaw, wide: true, ok: 'Simpan batas', sub: 'Impor Shapefile (.zip) / GeoJSON batas resmi atau gambar poligon. Batas besar akan disederhanakan otomatis agar muat.',
+  modal({ title: 'Batas kawasan: ' + kaw, wide: true, ok: 'Simpan batas', sub: 'Impor Shapefile (.zip) / KML/KMZ / GeoJSON batas resmi atau gambar poligon. Batas besar akan disederhanakan otomatis agar muat.',
     body: '<div id="btMap"></div>', onOk: function () {
       const g = ed && ed.geom(); if (!g) { $('mErr').textContent = 'Gambar atau impor batas terlebih dahulu.'; return false; }
       return api('batas_simpan', { kawasan: kaw, geojson: g }).then(function () { toast('ok', 'Batas kawasan tersimpan.'); fillBatas(); });

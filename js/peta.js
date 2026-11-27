@@ -1,7 +1,7 @@
 /* =====================================================================
  * MapKit — peta (Leaflet, self-host di vendor/leaflet) untuk SI-MITRA
  * - Geometri: luas (ha), titik-dalam-poligon, simplifikasi (Douglas–Peucker)
- * - Impor: GeoJSON (Geometry/Feature/FeatureCollection) atau daftar "lintang,bujur"
+ * - Impor: GeoJSON (Geometry/Feature/FeatureCollection), Shapefile, KML/KMZ, atau daftar "lintang,bujur"
  * - Editor poligon: klik untuk menambah titik, seret untuk menggeser, klik kanan untuk menghapus titik
  * - Peta ikhtisar: batas kawasan + area pengelolaan pengajuan
  * Format simpan: GeoJSON Polygon/MultiPolygon, koordinat [bujur, lintang] (6 desimal)
@@ -108,6 +108,62 @@ const MapKit = (function () {
     });
   }
   function withKat(fc, col) { return { type: 'FeatureCollection', features: fc.features.map(function (f) { const v = col && f.properties ? f.properties[col] : null; return { type: 'Feature', properties: col ? { kategori: String(v == null || v === '' ? 'Lainnya' : v).slice(0, 60) } : {}, geometry: f.geometry }; }) }; }
+  /** KML / KMZ → GeoJSON FeatureCollection (Polygon, MultiPolygon, Point, LineString). KMZ dibaca dengan DecompressionStream bawaan browser. */
+  function kmlCoords(txt) {
+    return String(txt || '').trim().split(/\s+/).map(function (t) { const a = t.split(',').map(Number); return a.length >= 2 && isFinite(a[0]) && isFinite(a[1]) ? [a[0], a[1]] : null; }).filter(Boolean);
+  }
+  function kmlRing(el) { const c = el && el.getElementsByTagName('coordinates')[0]; const r = kmlCoords(c && c.textContent); if (r.length < 3) return null; const f = r[0], l = r[r.length - 1]; if (f[0] !== l[0] || f[1] !== l[1]) r.push(f.slice()); return r; }
+  function kmlGeoms(pm) {
+    const out = [];
+    Array.prototype.forEach.call(pm.getElementsByTagName('Polygon'), function (pg) {
+      const ob = pg.getElementsByTagName('outerBoundaryIs')[0]; const o = kmlRing(ob); if (!o) return;
+      const rings = [o]; Array.prototype.forEach.call(pg.getElementsByTagName('innerBoundaryIs'), function (ib) { const r = kmlRing(ib); if (r) rings.push(r); });
+      out.push({ type: 'Polygon', coordinates: rings });
+    });
+    Array.prototype.forEach.call(pm.getElementsByTagName('LineString'), function (ls) { const c = kmlCoords((ls.getElementsByTagName('coordinates')[0] || {}).textContent); if (c.length > 1) out.push({ type: 'LineString', coordinates: c }); });
+    Array.prototype.forEach.call(pm.getElementsByTagName('Point'), function (pt) { const c = kmlCoords((pt.getElementsByTagName('coordinates')[0] || {}).textContent); if (c.length) out.push({ type: 'Point', coordinates: c[0] }); });
+    return out;
+  }
+  function parseKml(text) {
+    const doc = new DOMParser().parseFromString(String(text || '').replace(/^﻿/, ''), 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('Berkas KML tidak valid (XML rusak).');
+    const feats = [];
+    Array.prototype.forEach.call(doc.getElementsByTagName('Placemark'), function (pm) {
+      const pr = {}; const nm = pm.getElementsByTagName('name')[0]; if (nm && nm.parentNode === pm) pr.name = nm.textContent.trim().slice(0, 120);
+      const ds = pm.getElementsByTagName('description')[0]; if (ds && ds.parentNode === pm) { const t = ds.textContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); if (t) pr.description = t.slice(0, 160); }
+      let up = pm.parentNode; while (up && up.nodeType === 1) { if (up.localName === 'Folder' || up.localName === 'Document') { const fn = Array.prototype.filter.call(up.children, function (c) { return c.localName === 'name'; })[0]; if (fn && fn.textContent.trim()) { pr.folder = fn.textContent.trim().slice(0, 80); break; } } up = up.parentNode; }
+      Array.prototype.forEach.call(pm.getElementsByTagName('Data'), function (d) { const k = d.getAttribute('name'); const v = d.getElementsByTagName('value')[0]; if (k) pr[k] = v ? v.textContent.trim() : ''; });
+      Array.prototype.forEach.call(pm.getElementsByTagName('SimpleData'), function (d) { const k = d.getAttribute('name'); if (k) pr[k] = d.textContent.trim(); });
+      kmlGeoms(pm).forEach(function (g) { feats.push({ type: 'Feature', properties: pr, geometry: g }); });
+    });
+    if (!feats.length) throw new Error('KML ini tidak berisi objek geometri (Placemark).');
+    const poly = feats.filter(function (f) { return /Polygon/.test(f.geometry.type); });
+    if (!poly.length) throw new Error('KML ini tidak berisi poligon (hanya titik/garis). Gunakan objek Polygon.');
+    return { type: 'FeatureCollection', features: poly };
+  }
+  function unzipFirst(buf, pick) {
+    const dv = new DataView(buf), u8 = new Uint8Array(buf); let eo = -1;
+    for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65600); i--) { if (dv.getUint32(i, true) === 0x06054b50) { eo = i; break; } }
+    if (eo < 0) throw new Error('KMZ tidak valid (bukan arsip ZIP).');
+    let n = dv.getUint16(eo + 10, true), off = dv.getUint32(eo + 16, true), best = null;
+    for (let k = 0; k < n; k++) {
+      if (dv.getUint32(off, true) !== 0x02014b50) break;
+      const meth = dv.getUint16(off + 10, true), csz = dv.getUint32(off + 20, true), nl = dv.getUint16(off + 28, true), el = dv.getUint16(off + 30, true), cl = dv.getUint16(off + 32, true), lo = dv.getUint32(off + 42, true);
+      const nm = new TextDecoder().decode(u8.subarray(off + 46, off + 46 + nl));
+      if (pick.test(nm) && (!best || /(^|\/)doc\.kml$/i.test(nm))) best = { meth: meth, csz: csz, lo: lo, nm: nm };
+      off += 46 + nl + el + cl;
+    }
+    if (!best) throw new Error('KMZ tidak berisi berkas .kml.');
+    const ln = dv.getUint16(best.lo + 26, true), le = dv.getUint16(best.lo + 28, true), st = best.lo + 30 + ln + le; const data = u8.subarray(st, st + best.csz);
+    if (best.meth === 0) return Promise.resolve(new TextDecoder().decode(data));
+    if (best.meth !== 8 || typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Browser ini belum mendukung membuka KMZ. Ekspor ulang sebagai .kml, atau perbarui browser.'));
+    return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  }
+  function readKml(f) {
+    if (f.size > 40 * 1024 * 1024) return Promise.reject(new Error('Berkas KML/KMZ terlalu besar (maks. 40 MB).'));
+    const p = ext(f) === 'kmz' ? readBuf(f).then(function (b) { return unzipFirst(b, /\.kml$/i); }) : f.text();
+    return p.then(parseKml);
+  }
   /** Teks bebas → geometri. Menerima GeoJSON atau baris "lintang,bujur" (min. 3 titik). */
   function parseText(text) {
     const t = String(text || '').trim(); if (!t) throw new Error('Data kosong.');
@@ -260,7 +316,7 @@ const MapKit = (function () {
   /** Widget editor lengkap di dalam host. opts: {geom, kawasan, batas, onChange(geom|null, luas), maxChars, satelit, readonly} */
   function editor(host, opts) {
     opts = opts || {}; const maxChars = opts.maxChars || 40000, maxVert = opts.maxVert || MAX_VERT;
-    host.innerHTML = (opts.readonly ? '' : (opts.shpOnly ? '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="import">' + mi('upload_file') + ' Unggah Shapefile</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button></div>' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('edit_location') + ' Isi koordinat / Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>')) +
+    host.innerHTML = (opts.readonly ? '' : (opts.shpOnly ? '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="import">' + mi('upload_file') + ' Unggah Shapefile / KML</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button></div>' : '<div class="mapbar"><button type="button" class="btn btn-p btn-s" data-m="draw">' + mi('draw') + ' Gambar area</button><button type="button" class="btn btn-o btn-s" data-m="undo">' + mi('undo') + ' Urungkan</button><button type="button" class="btn btn-o btn-s" data-m="clear">' + mi('delete') + ' Hapus</button><button type="button" class="btn btn-o btn-s" data-m="import">' + mi('edit_location') + ' Isi koordinat / Impor</button><button type="button" class="btn btn-o btn-s" data-m="locate">' + mi('my_location') + ' Lokasi saya</button></div>')) +
       '<div class="mapbox"></div><div class="mapinfo" aria-live="polite"></div><div class="mapcheck"></div>';
     const box = host.querySelector('.mapbox'), info = host.querySelector('.mapinfo'), chk = host.querySelector('.mapcheck');
     const map = create(box, { satelit: opts.satelit, modal: opts.modal }); if (!map) return null;
@@ -299,14 +355,14 @@ const MapKit = (function () {
     function doImport() {
       let pn = host.querySelector('.imp'); if (pn) { pn.remove(); return; }
       pn = document.createElement('div'); pn.className = 'imp card';
-      pn.innerHTML = '<p class="sub" style="margin-bottom:8px">Tempel <b>GeoJSON</b> (Polygon / MultiPolygon / Feature / FeatureCollection, koordinat [bujur, lintang]) <b>atau</b> daftar titik, satu per baris: <code>lintang,bujur</code>. Atau pilih berkas <b>Shapefile</b> (.zip, atau .shp + .prj + .dbf sekaligus) / .geojson / .json.</p>' +
-        '<textarea class="in" data-imp="txt" rows="6" placeholder="-0.8917,119.8707&#10;-0.8920,119.8750&#10;-0.8950,119.8730"></textarea><input type="file" data-imp="file" multiple accept=".zip,.shp,.dbf,.prj,.cpg,.shx,.geojson,.json,.txt,application/json,application/zip" style="margin-top:8px"><div class="hint" data-imp="info" style="margin-top:6px"></div><div class="fld" data-imp="katbox" style="display:none;margin-top:8px"><label>Kolom kategori (tiap kategori diberi warna berbeda)</label><select class="in" data-imp="kol"></select></div><div class="fld" style="margin-top:8px"><label>Atau ambil dari ArcGIS Online (URL layer fitur publik)</label><div style="display:flex;gap:6px"><input class="in" data-imp="arc" placeholder="https://services.arcgis.com/…/FeatureServer/0"><button type="button" class="btn btn-o btn-s" data-imp="arcgo">Ambil</button></div></div>' +
+      pn.innerHTML = '<p class="sub" style="margin-bottom:8px">Tempel <b>GeoJSON</b> (Polygon / MultiPolygon / Feature / FeatureCollection, koordinat [bujur, lintang]) <b>atau</b> daftar titik, satu per baris: <code>lintang,bujur</code>. Atau pilih berkas <b>KML / KMZ</b>, <b>Shapefile</b> (.zip, atau .shp + .prj + .dbf sekaligus), .geojson, atau .json.</p>' +
+        '<textarea class="in" data-imp="txt" rows="6" placeholder="-0.8917,119.8707&#10;-0.8920,119.8750&#10;-0.8950,119.8730"></textarea><input type="file" data-imp="file" multiple accept=".zip,.shp,.dbf,.prj,.cpg,.shx,.kml,.kmz,.geojson,.json,.txt,application/json,application/zip" style="margin-top:8px"><div class="hint" data-imp="info" style="margin-top:6px"></div><div class="fld" data-imp="katbox" style="display:none;margin-top:8px"><label>Kolom kategori (tiap kategori diberi warna berbeda)</label><select class="in" data-imp="kol"></select></div><div class="fld" style="margin-top:8px"><label>Atau ambil dari ArcGIS Online (URL layer fitur publik)</label><div style="display:flex;gap:6px"><input class="in" data-imp="arc" placeholder="https://services.arcgis.com/…/FeatureServer/0"><button type="button" class="btn btn-o btn-s" data-imp="arcgo">Ambil</button></div></div>' +
         '<div class="errtxt" data-imp="err" role="alert"></div><div class="btns" style="margin-top:8px"><button type="button" class="btn btn-o btn-s" data-imp="cancel">Batal</button><button type="button" class="btn btn-p btn-s" data-imp="ok">Gunakan</button></div>';
       host.insertBefore(pn, box.parentNode === host ? box : null); const q = function (k) { return pn.querySelector('[data-imp="' + k + '"]'); };
-      if (opts.shpOnly) { pn.querySelector('p.sub').innerHTML = 'Unggah <b>Shapefile</b> area kegiatan Anda: satu berkas <b>.zip</b> berisi .shp, .shx, .dbf, dan .prj (disarankan), atau pilih berkas <b>.shp + .dbf + .prj</b> sekaligus. Hanya format Shapefile yang diterima.'; q('txt').style.display = 'none'; q('arc').closest('.fld').style.display = 'none'; q('file').accept = '.zip,.shp,.shx,.dbf,.prj,.cpg'; q('file').style.marginTop = '0'; }
+      if (opts.shpOnly) { pn.querySelector('p.sub').innerHTML = 'Unggah <b>Shapefile</b> atau <b>KML/KMZ</b> area kegiatan Anda. Untuk Shapefile: satu berkas <b>.zip</b> berisi .shp, .shx, .dbf, dan .prj (disarankan), atau pilih berkas <b>.shp + .dbf + .prj</b> sekaligus. Format yang diterima: Shapefile atau <b>KML / KMZ</b> (Google Earth).'; q('txt').style.display = 'none'; q('arc').closest('.fld').style.display = 'none'; q('file').accept = '.zip,.shp,.shx,.dbf,.prj,.cpg,.kml,.kmz'; q('file').style.marginTop = '0'; }
       q('cancel').onclick = function () { pn.remove(); };
       let pend = null; // {fc, cols} dari Shapefile / ArcGIS; kategori dipilih lewat kolom
-      const AUTO = /^(kategori|zona|zonasi|fungsi|klas|kelas|jenis|tipe|type|nama_zona|zone|nama|name|status|kode)/i;
+      const AUTO = /^(kategori|zona|zonasi|fungsi|klas|kelas|jenis|tipe|type|nama_zona|zone|folder|nama|name|status|kode)/i;
       const kolInfo = function () {
         const col = q('kol').value; const info = q('info'); const n = pend ? pend._n : 0;
         if (!col) { info.innerHTML = '&#10003; Terbaca: <b>' + n + '</b> poligon (tanpa kategori). Klik <b>Gunakan</b>.'; return; }
@@ -321,7 +377,8 @@ const MapKit = (function () {
         pend = { fc: fc, _n: polys.length }; const sel = q('kol'); sel.innerHTML = '<option value="">— Tanpa kategori (satu warna) —</option>' + usable.map(function (k) { return '<option value="' + esc(k) + '">' + esc(k) + '</option>'; }).join('');
         const auto = usable.filter(function (k) { return AUTO.test(k); }).sort(function (a, b) { const ia = AUTO.exec(a)[1].toLowerCase(), ib = AUTO.exec(b)[1].toLowerCase(); return 0; })[0];
         const multi = function (k) { const set = {}; fc.features.forEach(function (f) { set[String((f.properties || {})[k])] = 1; }); return Object.keys(set).length > 1; };
-        sel.value = (auto && multi(auto)) ? auto : (usable.filter(multi)[0] || ''); if (fc.features.length < 2 && !sel.value) sel.value = '';
+        const fol = usable.filter(function (k) { return k === 'folder' && multi(k); })[0];
+        sel.value = fol || ((auto && multi(auto)) ? auto : (usable.filter(multi)[0] || '')); if (fc.features.length < 2 && !sel.value) sel.value = '';
         q('katbox').style.display = usable.length ? '' : 'none'; q('txt').value = ''; kolInfo();
       };
       q('kol').onchange = kolInfo; q('txt').addEventListener('input', function () { pend = null; q('katbox').style.display = 'none'; });
@@ -332,7 +389,12 @@ const MapKit = (function () {
           readShapefile(fs).then(function (g) { setPending({ type: 'FeatureCollection', features: g.features }); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message || 'Shapefile tidak dapat dibaca.'; });
           return;
         }
-        if (opts.shpOnly) { q('err').textContent = 'Hanya Shapefile (.zip atau .shp) yang diterima.'; this.value = ''; return; }
+        if (fs.some(function (f) { return ['kml', 'kmz'].indexOf(ext(f)) > -1; })) {
+          q('info').textContent = 'Membaca KML…'; const kf = fs.filter(function (f) { return ['kml', 'kmz'].indexOf(ext(f)) > -1; })[0];
+          readKml(kf).then(function (fc) { setPending(fc); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message || 'KML tidak dapat dibaca.'; });
+          return;
+        }
+        if (opts.shpOnly) { q('err').textContent = 'Hanya Shapefile (.zip/.shp) atau KML/KMZ yang diterima.'; this.value = ''; return; }
         const f = fs[0]; if (f.size > 3 * 1024 * 1024) { q('err').textContent = 'Berkas terlalu besar (maks. 3 MB).'; return; } const r = new FileReader(); r.onload = function () { q('txt').value = r.result; }; r.readAsText(f);
       };
       q('arcgo').onclick = function () {
@@ -340,7 +402,7 @@ const MapKit = (function () {
         fetchArcgis(q('arc').value, 5).then(function (fc) { if (!fc.features.length) throw new Error('Layer tidak berisi fitur.'); setPending(fc); }).catch(function (e) { q('info').textContent = ''; q('err').textContent = e.message; });
       };
       q('ok').onclick = function () {
-        const btn = q('ok'); if (opts.shpOnly && !pend) { q('err').textContent = 'Pilih berkas Shapefile terlebih dahulu.'; return; } const work = function () {
+        const btn = q('ok'); if (opts.shpOnly && !pend) { q('err').textContent = 'Pilih berkas Shapefile atau KML/KMZ terlebih dahulu.'; return; } const work = function () {
           let g; try { g = normalize(pend ? withKat(pend.fc, q('kol').value) : parseText(q('txt').value), maxChars, maxVert); } catch (e) { q('err').textContent = e.message; q('info').textContent = ''; btn.disabled = false; return; }
         complex = null; const ps = polysOf(g.geom); if (!g.kats.length && ps.length === 1 && ps[0].length === 1) { pts = ps[0][0].slice(0, -1).map(function (p) { return [p[1], p[0]]; }); } else { pts = []; complex = g.geom; }
         setDrawing(false); render(true); changed(); if (g.note) toast('', 'Poligon ' + g.note + ' agar muat (' + g.vert + ' titik).'); if (g.kats.length) toast('ok', g.kats.length + ' kategori diberi warna berbeda.'); pn.remove();

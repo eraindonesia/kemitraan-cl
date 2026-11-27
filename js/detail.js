@@ -28,7 +28,7 @@ function renderWiz() {
       '<div class="row2"><div class="fld"><label>Kawasan konservasi <i>*</i></label><select class="in" data-f="kawasan"><option value="">Pilih kawasan…</option>' + S.master.kawasan.map(function (x) { return '<option' + (d.kawasan === x.nama ? ' selected' : '') + '>' + esc(x.nama) + '</option>'; }).join('') + '</select></div>' +
       '<div class="fld"><label>Zona <i>*</i></label><select class="in" data-f="zona"><option value="">Pilih zona…</option>' + zs.map(function (z) { return '<option' + (d.zona === z ? ' selected' : '') + '>' + esc(z) + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="fld"><label>Lokasi / area kegiatan <i>*</i></label><input class="in" data-f="lokasi" value="' + f('lokasi') + '"></div><div class="fld"><label>Luas area</label><input class="in" data-f="luas" placeholder="mis. 25 Ha" value="' + f('luas') + '"></div>';
-    if (!w.editId) { c += '<div class="fld"><label>Area pengelolaan (opsional)</label><p class="hint">Unggah <b>Shapefile</b> (.zip) area kegiatan yang diusulkan. Dapat diganti atau ditambah nanti pada tab Peta Area selama usulan masih Draft.</p><div id="wizMap"></div></div>'; setTimeout(wizMapInit, 0); }
+    if (!w.editId) { c += '<div class="fld"><label>Area pengelolaan (opsional)</label><p class="hint">Unggah <b>Shapefile</b> (.zip) atau <b>KML/KMZ</b> area kegiatan yang diusulkan. Dapat diganti atau ditambah nanti pada tab Peta Area selama usulan masih Draft.</p><div id="wizMap"></div></div>'; setTimeout(wizMapInit, 0); }
   } else if (st === 3) {
     c = '<div class="row2"><div class="fld"><label>Total rencana anggaran (Rp)</label><input class="in" type="number" min="0" data-f="biaya" value="' + f('biaya') + '"></div><div class="fld"><label>Sumber pembiayaan</label><input class="in" data-f="sumber" placeholder="Swadaya / CSR / hibah…" value="' + f('sumber') + '"></div></div>' +
       '<div class="callout info">' + mi('attach_file') + '<span>Dokumen persyaratan diunggah pada halaman detail setelah draft disimpan.</span></div>';
@@ -105,7 +105,7 @@ function vDetail() {
   renderDetailBody(); const c = S.det[p.id]; if (!c || !c.d || Date.now() - c.t > 20000) loadDetail(p.id);
 }
 function detData() { const c = S.det[S.params.id]; return c && c.d ? c.d : null; }
-function canUploadDoc(p) { if (FINAL.indexOf(p.status) > -1) return false; if (S.me.peran === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi'); if (S.me.peran === 'superadmin') return false; if (S.me.peran === 'admin' || S.me.peran === 'uptd') return p.tahap === 3 || p.tahap >= 9; return false; }
+function canUploadDoc(p) { if (FINAL.indexOf(p.status) > -1) return false; if (S.me.peran === 'mitra') return p.id_user === S.me.id && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi'); return false; }
 function canEditP(p) { return S.me.peran !== 'prl' && S.me.peran !== 'uptd' && S.me.peran !== 'admin' && S.me.peran !== 'kepala_dkp' && p.tahap === 1 && (p.status === 'Draft' || p.status === 'Perlu dilengkapi') && (isSuper() || p.id_user === S.me.id); }
 function tabsFor(p) {
   const t = [['ringkasan', 'Ringkasan'], ['dokumen', 'Dokumen']];
